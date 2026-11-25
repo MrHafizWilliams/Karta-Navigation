@@ -1,0 +1,22 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "region_id": "bn",
+        "name": "Brunei Darussalam with Sarawak Border Buffer"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [113.95, 3.95],
+          [115.45, 3.95],
+          [115.45, 5.15],
+          [113.95, 5.15],
+          [113.95, 3.95]
+        ]]
+      }
+    }
+  ]
+}

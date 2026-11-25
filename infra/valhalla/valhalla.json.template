@@ -1,0 +1,187 @@
+{
+  "mjolnir": {
+    "max_cache_size": 1000000000,
+    "id_table_size": 1300000000,
+    "use_lru_mem_cache": false,
+    "lru_mem_cache_hard_control": false,
+    "tile_dir": "/custom_files/valhalla_tiles",
+    "tile_extract": "/custom_files/valhalla_tiles.tar",
+    "traffic_extract": "/custom_files/traffic.tar",
+    "admin": "/custom_files/admins.sqlite",
+    "timezone": "/custom_files/timezones.sqlite",
+    "transit_dir": "/custom_files/transit_tiles",
+    "transit_feeds_dir": "/gtfs_feeds",
+    "transit_pbf_limit": 20000,
+    "hierarchy": true,
+    "shortcuts": true,
+    "concurrency": 4,
+    "include_driveways": true,
+    "include_construction": false,
+    "include_bicycle": true,
+    "include_pedestrian": true,
+    "include_driving": true,
+    "import_bike_share_stations": false,
+    "reclassify_links": true,
+    "logging": {
+      "type": "std_out",
+      "color": true
+    }
+  },
+  "loki": {
+    "actions": [
+      "locate",
+      "route",
+      "height",
+      "sources_to_targets",
+      "optimized_route",
+      "isochrone",
+      "trace_route",
+      "trace_attributes",
+      "transit_available",
+      "expansion",
+      "centroid",
+      "status"
+    ],
+    "use_connectivity": true,
+    "service_defaults": {
+      "radius": 25,
+      "minimum_reachability": 50,
+      "search_cutoff": 35000,
+      "node_snap_tolerance": 5,
+      "street_side_tolerance": 5,
+      "street_side_max_distance": 1000,
+      "heading_tolerance": 60
+    },
+    "logging": {
+      "type": "std_out",
+      "color": true
+    }
+  },
+  "thor": {
+    "logging": {
+      "type": "std_out",
+      "color": true
+    },
+    "source_to_target_algorithm": "select_optimal",
+    "max_reserved_labels_count": 2000000,
+    "clear_reserved_memory": false,
+    "extended_search": false
+  },
+  "odin": {
+    "logging": {
+      "type": "std_out",
+      "color": true
+    },
+    "markup_formatter": {
+      "markup_enabled": false,
+      "phoneme_format": "<TEXTUAL_STRING> (<VERBAL_STRING>)"
+    }
+  },
+  "meili": {
+    "mode": "auto",
+    "customizable": [
+      "mode",
+      "search_radius",
+      "turn_penalty_factor",
+      "gps_accuracy",
+      "interpolation_distance",
+      "sigma_z",
+      "beta",
+      "max_route_distance_factor",
+      "max_route_time_factor"
+    ],
+    "default": {
+      "sigma_z": 4.07,
+      "gps_accuracy": 5.0,
+      "beta": 3,
+      "max_route_distance_factor": 5,
+      "max_route_time_factor": 5,
+      "max_search_radius": 100,
+      "breakage_distance": 2000,
+      "interpolation_distance": 10,
+      "search_radius": 50,
+      "geometry": false,
+      "route": true,
+      "turn_penalty_factor": 0
+    },
+    "auto": {
+      "turn_penalty_factor": 200,
+      "search_radius": 50
+    },
+    "pedestrian": {
+      "turn_penalty_factor": 100,
+      "search_radius": 50
+    },
+    "bicycle": {
+      "turn_penalty_factor": 140
+    },
+    "multimodal": {
+      "turn_penalty_factor": 70
+    },
+    "logging": {
+      "type": "std_out",
+      "color": true
+    }
+  },
+  "httpd": {
+    "service": {
+      "listen": "tcp://*:8002",
+      "loopback": "ipc:///tmp/loopback",
+      "interrupt": "ipc:///tmp/interrupt",
+      "drain_seconds": 28,
+      "shutdown_seconds": 1,
+      "timeout_seconds": -1
+    }
+  },
+  "service_limits": {
+    "auto": {
+      "max_distance": 2500000.0,
+      "max_locations": 25,
+      "max_matrix_distance": 500000.0,
+      "max_matrix_location_pairs": 2500
+    },
+    "motorcycle": {
+      "max_distance": 2500000.0,
+      "max_locations": 25,
+      "max_matrix_distance": 500000.0,
+      "max_matrix_location_pairs": 2500
+    },
+    "bicycle": {
+      "max_distance": 500000.0,
+      "max_locations": 25,
+      "max_matrix_distance": 200000.0,
+      "max_matrix_location_pairs": 2500
+    },
+    "pedestrian": {
+      "max_distance": 150000.0,
+      "max_locations": 25,
+      "max_matrix_distance": 100000.0,
+      "max_matrix_location_pairs": 2500,
+      "max_transit_walking_distance": 10000,
+      "min_transit_walking_distance": 1
+    },
+    "multimodal": {
+      "max_distance": 500000.0,
+      "max_locations": 10,
+      "max_matrix_distance": 0.0,
+      "max_matrix_location_pairs": 0
+    },
+    "transit": {
+      "max_distance": 500000.0,
+      "max_locations": 10,
+      "max_matrix_distance": 0.0,
+      "max_matrix_location_pairs": 0
+    },
+    "trace": {
+      "max_distance": 300000.0,
+      "max_gps_accuracy": 100.0,
+      "max_search_radius": 100.0,
+      "max_shape": 16000
+    },
+    "max_alternates": 3,
+    "max_exclude_locations": 50,
+    "max_exclude_polygons_length": 10000,
+    "max_radius": 200,
+    "max_timedep_distance": 2500000
+  }
+}

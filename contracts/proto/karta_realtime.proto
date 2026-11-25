@@ -1,0 +1,171 @@
+syntax = "proto3";
+
+package karta.realtime.v1;
+
+option java_package = "com.karta.navigation.realtime.v1";
+option swift_prefix = "KartaRT";
+
+// Real-Time Geospatial Hazard Pub/Sub, Dynamic Traffic Rerouting & Telemetry Service
+// Backed by Redis Geo, Redis Pub/Sub (geohash5 cell channels), PostGIS, and Valhalla.
+service RealtimeHazardService {
+  // Low-latency bi-directional channel for active navigation clients & automotive head units.
+  rpc StreamNavigationChannel(stream ClientEnvelope) returns (stream ServerEnvelope);
+
+  // Unary hazard submission (e.g., offline queue flush or voice reporting from native SDK).
+  rpc ReportHazard(HazardReportRequest) returns (HazardRecord);
+
+  // Heading-aware dynamic radius query for immediate bootstrap on launch.
+  rpc QueryNearbyHazards(NearbyHazardsRequest) returns (NearbyHazardsResponse);
+}
+
+enum HazardCategory {
+  HAZARD_CATEGORY_UNSPECIFIED = 0;
+  POLICE = 1;
+  ACCIDENT = 2;
+  POTHOLE = 3;
+  HIDDEN_VEHICLE = 4;
+  ROAD_DEBRIS = 5;
+  ROAD_CLOSURE = 6;
+}
+
+enum HazardSeverity {
+  HAZARD_SEVERITY_UNSPECIFIED = 0;
+  LOW = 1;
+  MEDIUM = 2;
+  HIGH = 3;
+}
+
+message Coordinate {
+  double lat = 1;
+  double lon = 2;
+}
+
+message TelemetryUpdate {
+  string session_id = 1;
+  Coordinate coordinate = 2;
+  double heading_deg = 3;
+  double speed_kmh = 4;
+  string country_code = 5;
+  string route_id = 6;
+  string route_polyline6 = 7;
+  string route_profile = 8;
+  string vehicle_profile = 9;
+  Coordinate destination = 10;
+}
+
+message HazardReportRequest {
+  string session_id = 1;
+  HazardCategory category = 2;
+  string subtype = 3;
+  HazardSeverity severity = 4;
+  Coordinate coordinate = 5;
+  double heading_deg = 6;
+  bool affects_both_directions = 7;
+  string lane_hint = 8;
+  string description = 9;
+  string source = 10; // "radial", "voice", "grpc"
+}
+
+message HazardVoteRequest {
+  string session_id = 1;
+  string hazard_id = 2;
+  string vote = 3; // "confirm" or "cleared"
+  Coordinate coordinate = 4;
+}
+
+message RerouteDecision {
+  string proposal_id = 1;
+  string action = 2; // "accept" or "dismiss"
+}
+
+message ClientEnvelope {
+  oneof payload {
+    TelemetryUpdate telemetry = 1;
+    HazardReportRequest report_hazard = 2;
+    HazardVoteRequest vote_hazard = 3;
+    RerouteDecision reroute_decision = 4;
+  }
+}
+
+message HazardRecord {
+  string id = 1;
+  HazardCategory category = 2;
+  string subtype = 3;
+  HazardSeverity severity = 4;
+  string status = 5;
+  Coordinate coordinate = 6;
+  double road_heading_deg = 7;
+  bool affects_both_directions = 8;
+  string road_name = 9;
+  string road_ref = 10;
+  string country_code = 11;
+  string lane_hint = 12;
+  string description = 13;
+  int32 confirmations = 14;
+  int32 denials = 15;
+  double confidence_score = 16;
+  double distance_meters = 17;
+  double bearing_delta_deg = 18;
+  bool on_active_route = 19;
+  string created_at = 20;
+  string expires_at = 21;
+}
+
+message HazardRemoved {
+  string hazard_id = 1;
+  string reason = 2;
+}
+
+message CongestionSegment {
+  double start_fraction = 1;
+  double end_fraction = 2;
+  string severity = 3; // "free", "moderate", "heavy", "blocked"
+  int32 speed_kmh = 4;
+  string hazard_id = 5;
+}
+
+message EtaUpdate {
+  string route_id = 1;
+  double remaining_duration_seconds = 2;
+  double traffic_delay_seconds = 3;
+  repeated CongestionSegment congestion_segments = 4;
+}
+
+message RerouteProposal {
+  string proposal_id = 1;
+  string reason = 2;
+  string trigger_hazard_id = 3;
+  double time_saved_seconds = 4;
+  string toll_delta_display = 5;
+  int32 auto_accept_seconds = 6;
+  string proposed_route_json = 7;
+}
+
+message SessionAck {
+  string session_id = 1;
+  int64 traffic_epoch = 2;
+  repeated HazardRecord initial_hazards = 3;
+}
+
+message ServerEnvelope {
+  string event_type = 1;
+  oneof payload {
+    SessionAck session_ack = 2;
+    HazardRecord hazard_alert = 3;
+    HazardRemoved hazard_removed = 4;
+    EtaUpdate eta_update = 5;
+    RerouteProposal reroute_proposal = 6;
+  }
+}
+
+message NearbyHazardsRequest {
+  Coordinate coordinate = 1;
+  double heading_deg = 2;
+  double speed_kmh = 3;
+  double max_radius_meters = 4;
+}
+
+message NearbyHazardsResponse {
+  double effective_radius_meters = 1;
+  repeated HazardRecord hazards = 2;
+}

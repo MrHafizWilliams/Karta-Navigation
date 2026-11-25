@@ -1,0 +1,22 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "region_id": "my-borneo",
+        "name": "East Malaysia (Sabah, Sarawak, Labuan with Brunei Transit Buffer)"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [109.50, 0.85],
+          [119.40, 0.85],
+          [119.40, 7.45],
+          [109.50, 7.45],
+          [109.50, 0.85]
+        ]]
+      }
+    }
+  ]
+}

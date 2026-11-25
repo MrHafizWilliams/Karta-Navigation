@@ -1,0 +1,22 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "region_id": "my-peninsular-south",
+        "name": "Malaysia South (Johor with SG Checkpoint Buffer)"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [102.45, 1.20],
+          [104.55, 1.20],
+          [104.55, 2.85],
+          [102.45, 2.85],
+          [102.45, 1.20]
+        ]]
+      }
+    }
+  ]
+}

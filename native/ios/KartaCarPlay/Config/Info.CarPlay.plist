@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- Merge these keys into apps/karta_app/ios/Runner/Info.plist -->
+    <key>UIApplicationSceneManifest</key>
+    <dict>
+        <key>UIApplicationSupportsMultipleScenes</key>
+        <true/>
+        <key>UISceneConfigurations</key>
+        <dict>
+            <key>UIWindowSceneSessionRoleApplication</key>
+            <array>
+                <dict>
+                    <key>UISceneConfigurationName</key>
+                    <string>Karta Phone Scene</string>
+                    <key>UISceneDelegateClassName</key>
+                    <string>$(PRODUCT_MODULE_NAME).SceneDelegate</string>
+                </dict>
+            </array>
+            <key>CPTemplateApplicationSceneSessionRoleApplication</key>
+            <array>
+                <dict>
+                    <key>UISceneConfigurationName</key>
+                    <string>Karta CarPlay Navigation</string>
+                    <key>UISceneDelegateClassName</key>
+                    <string>KartaCarPlay.KartaCarPlaySceneDelegate</string>
+                </dict>
+            </array>
+        </dict>
+    </dict>
+    <key>UIBackgroundModes</key>
+    <array>
+        <string>location</string>
+        <string>audio</string>
+    </array>
+    <key>NSLocationWhenInUseUsageDescription</key>
+    <string>Karta uses your live GPS position solely for turn-by-turn navigation, lane guidance, and MY/SG/BN toll alerts. Zero raw GPS history is retained unless you explicitly opt in.</string>
+    <key>NSMicrophoneUsageDescription</key>
+    <string>Karta uses your microphone for hands-free road hazard reporting on CarPlay in English, Bahasa Melayu, Manglish, and Singlish.</string>
+    <key>NSSpeechRecognitionUsageDescription</key>
+    <string>Karta transcribes hands-free hazard reports on-device so you never have to touch the screen while driving.</string>
+</dict>
+</plist>

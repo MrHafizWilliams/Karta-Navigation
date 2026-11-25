@@ -1,0 +1,24 @@
+name: karta_automotive_bridge
+description: Decoupled Pigeon IDL contracts and MethodChannel bridge streaming headless Karta navigation state to Apple CarPlay (CPMapTemplate) and Android Auto (NavigationTemplate).
+version: 0.2.0
+publish_to: none
+
+environment:
+  sdk: ">=3.6.0 <4.0.0"
+  flutter: ">=3.24.0"
+
+resolution: workspace
+
+dependencies:
+  flutter:
+    sdk: flutter
+  karta_api_client:
+    path: ../karta_api_client
+  karta_navigation_core:
+    path: ../karta_navigation_core
+  meta: ^1.15.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0

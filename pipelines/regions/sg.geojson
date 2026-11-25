@@ -1,0 +1,22 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "region_id": "sg",
+        "name": "Singapore with Causeway and Tuas Second Link Buffer"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [103.56, 1.14],
+          [104.12, 1.14],
+          [104.12, 1.52],
+          [103.56, 1.52],
+          [103.56, 1.14]
+        ]]
+      }
+    }
+  ]
+}

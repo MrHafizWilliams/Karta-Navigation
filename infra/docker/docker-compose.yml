@@ -1,0 +1,188 @@
+name: karta
+
+services:
+  postgres:
+    image: postgis/postgis:16-3.4
+    container_name: karta-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-karta}
+      POSTGRES_USER: ${POSTGRES_USER:-karta}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-karta_dev_change_me}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    command:
+      - postgres
+      - -c
+      - shared_buffers=512MB
+      - -c
+      - work_mem=32MB
+      - -c
+      - maintenance_work_mem=256MB
+      - -c
+      - effective_cache_size=1536MB
+      - -c
+      - max_connections=100
+    volumes:
+      - karta_pgdata:/var/lib/postgresql/data
+      - ../postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-karta} -d ${POSTGRES_DB:-karta}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  redis:
+    image: redis:7.4-alpine
+    container_name: karta-redis
+    restart: unless-stopped
+    command:
+      - redis-server
+      - --appendonly
+      - "yes"
+      - --maxmemory
+      - 512mb
+      - --maxmemory-policy
+      - volatile-lru
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - karta_redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  pmtiles:
+    image: protomaps/go-pmtiles:latest
+    container_name: karta-pmtiles
+    restart: unless-stopped
+    command:
+      - serve
+      - /data
+      - --port=8081
+      - --cors=*
+      - --public-url=${PMTILES_PUBLIC_URL:-http://localhost:8081}
+    ports:
+      - "${PMTILES_PORT:-8081}:8081"
+    volumes:
+      - ../../data/pmtiles:/data:ro
+
+  valhalla:
+    image: ghcr.io/valhalla/valhalla-scripted:latest
+    container_name: karta-valhalla
+    restart: unless-stopped
+    entrypoint: ["valhalla_service", "/data/valhalla/valhalla.json", "${VALHALLA_SERVER_THREADS:-4}"]
+    ports:
+      - "${VALHALLA_PORT:-8002}:8002"
+    volumes:
+      - ../../data/valhalla:/data/valhalla:ro
+      - ../../data/raw/gtfs:/data/raw/gtfs:ro
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8002/status > /dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 15s
+
+  karta-api:
+    build:
+      context: ../../services/karta-api
+      dockerfile: Dockerfile
+    container_name: karta-api
+    restart: unless-stopped
+    ports:
+      - "${KARTA_API_PORT:-8000}:8000"
+      - "${KARTA_GRPC_PORT:-50051}:50051"
+    environment:
+      KARTA_ENV: ${KARTA_ENV:-development}
+      KARTA_LOG_LEVEL: ${KARTA_LOG_LEVEL:-INFO}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-karta}:${POSTGRES_PASSWORD:-karta_dev_change_me}@postgres:5432/${POSTGRES_DB:-karta}
+      REDIS_URL: redis://redis:6379/0
+      VALHALLA_URL: http://valhalla:8002
+      VALHALLA_TRAFFIC_TAR_PATH: /data/valhalla/traffic.tar
+      PMTILES_PUBLIC_URL: ${PMTILES_PUBLIC_URL:-http://localhost:8081}
+      PMTILES_INTERNAL_URL: http://pmtiles:8081
+      COSTING_PROFILES_PATH: /config/valhalla/costing_profiles.json
+      PHASE3_SCHEMA_SQL_PATH: /config/postgres/init/003_phase3_realtime_commuter.sql
+      OFFLINE_PACKS_DIR: /data/offline_packs
+      OFFLINE_PACKS_BASE_URL: ${KARTA_OFFLINE_PACKS_BASE_URL:-http://localhost:8000/v1/regions/downloads}
+      GRPC_ENABLED: ${KARTA_GRPC_ENABLED:-true}
+      GRPC_LISTEN_ADDR: 0.0.0.0:50051
+      WHISPER_TRANSCRIBE_URL: ${WHISPER_TRANSCRIBE_URL:-}
+      GOOGLE_CALENDAR_CLIENT_ID: ${GOOGLE_CALENDAR_CLIENT_ID:-}
+      FACEBOOK_APP_ID: ${FACEBOOK_APP_ID:-}
+    volumes:
+      - ../valhalla:/config/valhalla:ro
+      - ../postgres/init:/config/postgres/init:ro
+      - ../../data/offline_packs:/data/offline_packs:ro
+      - ../../data/valhalla:/data/valhalla:rw
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      valhalla:
+        condition: service_started
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/v1/health/live')\""]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # ============================================================================
+  # ON-DEMAND PIPELINE CONTAINERS (run via `--profile pipeline`)
+  # ============================================================================
+  pipeline:
+    build:
+      context: ../../pipelines
+      dockerfile: Dockerfile
+    profiles: ["pipeline"]
+    environment:
+      PGHOST: postgres
+      PGPORT: "5432"
+      PGDATABASE: ${POSTGRES_DB:-karta}
+      PGUSER: ${POSTGRES_USER:-karta}
+      PGPASSWORD: ${POSTGRES_PASSWORD:-karta_dev_change_me}
+      REDIS_URL: redis://redis:6379/0
+      OSM_SOURCE_URL: ${OSM_SOURCE_URL:-https://download.geofabrik.de/asia/malaysia-singapore-brunei-latest.osm.pbf}
+      OSM_PBF_FILENAME: ${OSM_PBF_FILENAME:-malaysia-singapore-brunei-latest.osm.pbf}
+      SG_GTFS_STATIC_URL: ${SG_GTFS_STATIC_URL:-https://github.com/thecrapone/singapore-gtfs-2026/releases/latest/download/gtfs.zip}
+      PMTILES_PUBLIC_URL: ${PMTILES_PUBLIC_URL:-http://localhost:8081}
+      OFFLINE_PACKS_BASE_URL: ${KARTA_OFFLINE_PACKS_BASE_URL:-http://localhost:8000/v1/regions/downloads}
+    volumes:
+      - ../../data:/data
+      - ../../pipelines:/pipelines:ro
+      - ../valhalla:/config/valhalla:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  planetiler:
+    image: ghcr.io/onthegomap/planetiler:latest
+    profiles: ["pipeline"]
+    environment:
+      JAVA_TOOL_OPTIONS: -Xmx${PLANETILER_JAVA_XMX:-4g}
+    volumes:
+      - ../../data:/data
+
+  valhalla-builder:
+    image: ghcr.io/valhalla/valhalla-scripted:latest
+    profiles: ["pipeline"]
+    entrypoint: ["/bin/bash"]
+    environment:
+      VALHALLA_BUILD_TRANSIT: ${VALHALLA_BUILD_TRANSIT:-True}
+      VALHALLA_THREADS: ${VALHALLA_SERVER_THREADS:-4}
+      PMTILES_PUBLIC_URL: ${PMTILES_PUBLIC_URL:-http://localhost:8081}
+      OFFLINE_PACKS_BASE_URL: ${KARTA_OFFLINE_PACKS_BASE_URL:-http://localhost:8000/v1/regions/downloads}
+    volumes:
+      - ../../data:/data
+      - ../../pipelines:/pipelines:ro
+      - ../valhalla:/config/valhalla:ro
+
+volumes:
+  karta_pgdata:
+  karta_redisdata:

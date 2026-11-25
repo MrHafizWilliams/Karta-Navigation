@@ -1,0 +1,23 @@
+name: karta_workspace
+repository: https://github.com/MrHafizWilliams/Karta-Navigation
+
+packages:
+  - apps/**
+  - packages/**
+
+command:
+  bootstrap:
+    runPubGetInParallel: true
+
+scripts:
+  analyze:
+    run: melos exec -- "dart analyze --fatal-infos"
+    description: Run static analysis across all Flutter & Dart packages.
+
+  test:
+    run: melos exec --dir-exists="test" -- "flutter test"
+    description: Run unit and widget tests across all Dart/Flutter packages.
+
+  codegen:
+    run: melos exec --depends-on="build_runner" -- "dart run build_runner build --delete-conflicting-outputs"
+    description: Run build_runner code generation (Freezed, JSON, OpenAPI, Pigeon).

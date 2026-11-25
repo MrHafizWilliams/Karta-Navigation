@@ -1,0 +1,47 @@
+# Brunei Darussalam Toll Facilities (BND / B$) & Regional Public Holidays
+
+gantries:
+  - gantry_id: BN-RASAU-BRIDGE
+    corridor_id: BN-RASAU
+    external_code: BN-RS-01
+    name: Rasau / Sungai Teraban Toll Bridge (Belait)
+    role: open_plaza
+    direction_code: BOTH
+    direction_bearing: null
+    tripwire_half_width_m: 45
+    lat: 4.57845
+    lon: 114.17835
+    accepted_payments: [CASH, BRUNEI_TOLL_CARD]
+    lane_layout:
+      - { lane: 1, methods: [BRUNEI_TOLL_CARD] }
+      - { lane: 2, methods: [CASH] }
+
+open_rates:
+  - { gantry_id: BN-RASAU-BRIDGE, country_code: BN, vehicle_class: BN_C1, amount_minor: 300, currency_code: BND }
+  - { gantry_id: BN-RASAU-BRIDGE, country_code: BN, vehicle_class: BN_C2, amount_minor: 500, currency_code: BND }
+  - { gantry_id: BN-RASAU-BRIDGE, country_code: BN, vehicle_class: BN_C3, amount_minor: 800, currency_code: BND }
+  - { gantry_id: BN-RASAU-BRIDGE, country_code: BN, vehicle_class: BN_C4, amount_minor: 500, currency_code: BND }
+  - { gantry_id: BN-RASAU-BRIDGE, country_code: BN, vehicle_class: BN_MC, amount_minor: 100, currency_code: BND }
+  - { gantry_id: BN-RASAU-BRIDGE, country_code: BN, vehicle_class: BN_TX, amount_minor: 300, currency_code: BND }
+
+public_holidays:
+  # Singapore Public Holidays (2026-2027) — ERP charges do not apply on SG public holidays
+  - { country_code: SG, holiday_date: "2026-01-01", name: "New Year's Day", toll_override_rule: SUNDAY_PH }
+  - { country_code: SG, holiday_date: "2026-02-17", name: "Chinese New Year", toll_override_rule: SUNDAY_PH }
+  - { country_code: SG, holiday_date: "2026-02-18", name: "Chinese New Year (Day 2)", toll_override_rule: SUNDAY_PH }
+  - { country_code: SG, holiday_date: "2026-03-21", name: "Hari Raya Puasa", toll_override_rule: SUNDAY_PH }
+  - { country_code: SG, holiday_date: "2026-04-03", name: "Good Friday", toll_override_rule: SUNDAY_PH }
+  - { country_code: SG, holiday_date: "2026-05-01", name: "Labour Day", toll_override_rule: SUNDAY_PH }
+  - { country_code: SG, holiday_date: "2026-05-27", name: "Hari Raya Haji", toll_override_rule: SUNDAY_PH }
+  - { country_code: SG, holiday_date: "2026-05-31", name: "Vesak Day", toll_override_rule: SUNDAY_PH }
+  - { country_code: SG, holiday_date: "2026-08-09", name: "National Day", toll_override_rule: SUNDAY_PH }
+  - { country_code: SG, holiday_date: "2026-11-08", name: "Deepavali", toll_override_rule: SUNDAY_PH }
+  - { country_code: SG, holiday_date: "2026-12-25", name: "Christmas Day", toll_override_rule: SUNDAY_PH }
+  - { country_code: SG, holiday_date: "2027-01-01", name: "New Year's Day", toll_override_rule: SUNDAY_PH }
+
+  # Malaysia Key National Holidays
+  - { country_code: MY, holiday_date: "2026-08-31", name: "Hari Kebangsaan (Merdeka)", toll_override_rule: SUNDAY_PH }
+  - { country_code: MY, holiday_date: "2026-09-16", name: "Malaysia Day", toll_override_rule: SUNDAY_PH }
+
+  # Brunei Key National Holidays
+  - { country_code: BN, holiday_date: "2026-02-23", name: "Brunei National Day", toll_override_rule: SUNDAY_PH }

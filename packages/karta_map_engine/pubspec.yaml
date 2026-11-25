@@ -1,0 +1,27 @@
+name: karta_map_engine
+description: Platform-agnostic 3D MapLibre GL / Native engine with PMTiles vector basemap, 3D extruded buildings, 3D vehicle meshes, and Street-Level Look-Around hooks.
+version: 0.2.0
+publish_to: none
+
+environment:
+  sdk: ">=3.6.0 <4.0.0"
+  flutter: ">=3.24.0"
+
+resolution: workspace
+
+dependencies:
+  flutter:
+    sdk: flutter
+  http: ^1.2.2
+  karta_api_client:
+    path: ../karta_api_client
+  karta_design_system:
+    path: ../karta_design_system
+  karta_navigation_core:
+    path: ../karta_navigation_core
+  web: ^1.1.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0

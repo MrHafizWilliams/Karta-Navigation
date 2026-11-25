@@ -1,0 +1,472 @@
+# Malaysia Toll Plazas (Closed PLUS Interchanges + Open Expressways + Border CIQ)
+# Coordinates are WGS 84 (lat, lon); direction_bearing is travel heading (0=N, 90=E, 180=S, 270=W; null=bidirectional).
+# Monetary amounts in integer minor units (MYR sen: 100 = RM 1.00).
+
+gantries:
+  # ---------------------------------------------------------------------------
+  # PLUS CLOSED-SYSTEM INTERCHANGE PLAZAS (E1 / E2 / NKVE / ELITE)
+  # ---------------------------------------------------------------------------
+  - gantry_id: MY-PLUS-JLN_DUTA
+    corridor_id: MY-PLUS-MAIN
+    external_code: "101"
+    name: Plaza Tol Jalan Duta
+    role: entry_exit
+    direction_code: BOTH
+    direction_bearing: null
+    tripwire_half_width_m: 65
+    lat: 3.18064
+    lon: 101.66263
+    accepted_payments: [RFID, SMARTTAG, TNG_CARD, ANPR_JUSTGO]
+    lane_layout:
+      - { lane: 1, methods: [RFID, ANPR_JUSTGO] }
+      - { lane: 2, methods: [RFID] }
+      - { lane: 3, methods: [SMARTTAG] }
+      - { lane: 4, methods: [TNG_CARD] }
+
+  - gantry_id: MY-PLUS-SG_BESI
+    corridor_id: MY-PLUS-MAIN
+    external_code: "201"
+    name: Plaza Tol Sungai Besi
+    role: entry_exit
+    direction_code: BOTH
+    direction_bearing: null
+    tripwire_half_width_m: 80
+    lat: 3.04684
+    lon: 101.70623
+    accepted_payments: [RFID, SMARTTAG, TNG_CARD, ANPR_JUSTGO]
+    lane_layout:
+      - { lane: 1, methods: [RFID, ANPR_JUSTGO] }
+      - { lane: 2, methods: [RFID] }
+      - { lane: 3, methods: [SMARTTAG] }
+      - { lane: 4, methods: [TNG_CARD] }
+
+  - gantry_id: MY-PLUS-SUBANG
+    corridor_id: MY-PLUS-MAIN
+    external_code: "104"
+    name: Plaza Tol Subang
+    role: entry_exit
+    direction_code: BOTH
+    direction_bearing: null
+    tripwire_half_width_m: 55
+    lat: 3.10955
+    lon: 101.58443
+    accepted_payments: [RFID, SMARTTAG, TNG_CARD, ANPR_JUSTGO]
+    lane_layout:
+      - { lane: 1, methods: [RFID] }
+      - { lane: 2, methods: [SMARTTAG] }
+      - { lane: 3, methods: [TNG_CARD] }
+
+  - gantry_id: MY-PLUS-SHAH_ALAM
+    corridor_id: MY-PLUS-MAIN
+    external_code: "105"
+    name: Plaza Tol Shah Alam
+    role: entry_exit
+    direction_code: BOTH
+    direction_bearing: null
+    tripwire_half_width_m: 60
+    lat: 3.08469
+    lon: 101.55464
+    accepted_payments: [RFID, SMARTTAG, TNG_CARD, ANPR_JUSTGO]
+    lane_layout:
+      - { lane: 1, methods: [RFID] }
+      - { lane: 2, methods: [SMARTTAG] }
+      - { lane: 3, methods: [TNG_CARD] }
+
+  - gantry_id: MY-PLUS-RAWANG
+    corridor_id: MY-PLUS-MAIN
+    external_code: "115"
+    name: Plaza Tol Rawang
+    role: entry_exit
+    direction_code: BOTH
+    direction_bearing: null
+    tripwire_half_width_m: 55
+    lat: 3.31458
+    lon: 101.55543
+    accepted_payments: [RFID, SMARTTAG, TNG_CARD, ANPR_JUSTGO]
+    lane_layout:
+      - { lane: 1, methods: [RFID] }
+      - { lane: 2, methods: [SMARTTAG] }
+      - { lane: 3, methods: [TNG_CARD] }
+
+  - gantry_id: MY-PLUS-SEREMBAN
+    corridor_id: MY-PLUS-MAIN
+    external_code: "218"
+    name: Plaza Tol Seremban
+    role: entry_exit
+    direction_code: BOTH
+    direction_bearing: null
+    tripwire_half_width_m: 55
+    lat: 2.71247
+    lon: 101.90878
+    accepted_payments: [RFID, SMARTTAG, TNG_CARD, ANPR_JUSTGO]
+    lane_layout:
+      - { lane: 1, methods: [RFID] }
+      - { lane: 2, methods: [SMARTTAG] }
+      - { lane: 3, methods: [TNG_CARD] }
+
+  - gantry_id: MY-PLUS-AYER_KEROH
+    corridor_id: MY-PLUS-MAIN
+    external_code: "231"
+    name: Plaza Tol Ayer Keroh
+    role: entry_exit
+    direction_code: BOTH
+    direction_bearing: null
+    tripwire_half_width_m: 55
+    lat: 2.31377
+    lon: 102.31565
+    accepted_payments: [RFID, SMARTTAG, TNG_CARD, ANPR_JUSTGO]
+    lane_layout:
+      - { lane: 1, methods: [RFID] }
+      - { lane: 2, methods: [SMARTTAG] }
+      - { lane: 3, methods: [TNG_CARD] }
+
+  - gantry_id: MY-PLUS-IPOH_SELATAN
+    corridor_id: MY-PLUS-MAIN
+    external_code: "138"
+    name: Plaza Tol Ipoh Selatan
+    role: entry_exit
+    direction_code: BOTH
+    direction_bearing: null
+    tripwire_half_width_m: 60
+    lat: 4.62319
+    lon: 101.11805
+    accepted_payments: [RFID, SMARTTAG, TNG_CARD, ANPR_JUSTGO]
+    lane_layout:
+      - { lane: 1, methods: [RFID] }
+      - { lane: 2, methods: [SMARTTAG] }
+      - { lane: 3, methods: [TNG_CARD] }
+
+  - gantry_id: MY-PLUS-JURU
+    corridor_id: MY-PLUS-MAIN
+    external_code: "160"
+    name: Plaza Tol Juru
+    role: entry_exit
+    direction_code: BOTH
+    direction_bearing: null
+    tripwire_half_width_m: 75
+    lat: 5.31838
+    lon: 100.43753
+    accepted_payments: [RFID, SMARTTAG, TNG_CARD, ANPR_JUSTGO]
+    lane_layout:
+      - { lane: 1, methods: [RFID, ANPR_JUSTGO] }
+      - { lane: 2, methods: [SMARTTAG] }
+      - { lane: 3, methods: [TNG_CARD] }
+
+  - gantry_id: MY-PLUS-SKUDAI
+    corridor_id: MY-PLUS-MAIN
+    external_code: "252"
+    name: Plaza Tol Skudai
+    role: entry_exit
+    direction_code: BOTH
+    direction_bearing: null
+    tripwire_half_width_m: 75
+    lat: 1.60852
+    lon: 103.65125
+    accepted_payments: [RFID, SMARTTAG, TNG_CARD, ANPR_JUSTGO]
+    lane_layout:
+      - { lane: 1, methods: [RFID, ANPR_JUSTGO] }
+      - { lane: 2, methods: [SMARTTAG] }
+      - { lane: 3, methods: [TNG_CARD] }
+
+  # ---------------------------------------------------------------------------
+  # OPEN-SYSTEM URBAN EXPRESSWAY PLAZAS (LDP, SPRINT, DUKE, KESAS, AKLEH, SUKE, PENANG BRIDGE)
+  # ---------------------------------------------------------------------------
+  - gantry_id: MY-LDP-PENCHALA
+    corridor_id: MY-LDP
+    external_code: LDP-01
+    name: Plaza Tol Penchala (LDP)
+    role: open_plaza
+    direction_code: BOTH
+    direction_bearing: null
+    tripwire_half_width_m: 55
+    lat: 3.16422
+    lon: 101.61349
+    accepted_payments: [RFID, SMARTTAG, TNG_CARD, OPEN_PAYMENT_CARD]
+    lane_layout:
+      - { lane: 1, methods: [RFID] }
+      - { lane: 2, methods: [SMARTTAG] }
+      - { lane: 3, methods: [TNG_CARD, OPEN_PAYMENT_CARD] }
+
+  - gantry_id: MY-LDP-PJ
+    corridor_id: MY-LDP
+    external_code: LDP-02
+    name: Plaza Tol Petaling Jaya (LDP)
+    role: open_plaza
+    direction_code: BOTH
+    direction_bearing: null
+    tripwire_half_width_m: 55
+    lat: 3.09537
+    lon: 101.60422
+    accepted_payments: [RFID, SMARTTAG, TNG_CARD, OPEN_PAYMENT_CARD]
+    lane_layout:
+      - { lane: 1, methods: [RFID] }
+      - { lane: 2, methods: [SMARTTAG] }
+      - { lane: 3, methods: [TNG_CARD, OPEN_PAYMENT_CARD] }
+
+  - gantry_id: MY-LDP-PUCHONG_SELATAN
+    corridor_id: MY-LDP
+    external_code: LDP-03
+    name: Plaza Tol Puchong Selatan (LDP)
+    role: open_plaza
+    direction_code: BOTH
+    direction_bearing: null
+    tripwire_half_width_m: 55
+    lat: 3.00311
+    lon: 101.62272
+    accepted_payments: [RFID, SMARTTAG, TNG_CARD, OPEN_PAYMENT_CARD]
+    lane_layout:
+      - { lane: 1, methods: [RFID] }
+      - { lane: 2, methods: [SMARTTAG] }
+      - { lane: 3, methods: [TNG_CARD, OPEN_PAYMENT_CARD] }
+
+  - gantry_id: MY-SPRINT-DAMANSARA
+    corridor_id: MY-SPRINT
+    external_code: SPRINT-01
+    name: Plaza Tol Damansara (SPRINT)
+    role: open_plaza
+    direction_code: BOTH
+    direction_bearing: null
+    tripwire_half_width_m: 50
+    lat: 3.13384
+    lon: 101.61641
+    accepted_payments: [RFID, SMARTTAG, TNG_CARD, OPEN_PAYMENT_CARD]
+    lane_layout:
+      - { lane: 1, methods: [RFID] }
+      - { lane: 2, methods: [SMARTTAG] }
+      - { lane: 3, methods: [TNG_CARD, OPEN_PAYMENT_CARD] }
+
+  - gantry_id: MY-SPRINT-PANTAI
+    corridor_id: MY-SPRINT
+    external_code: SPRINT-02
+    name: Plaza Tol Pantai (SPRINT)
+    role: open_plaza
+    direction_code: BOTH
+    direction_bearing: null
+    tripwire_half_width_m: 50
+    lat: 3.12358
+    lon: 101.66213
+    accepted_payments: [RFID, SMARTTAG, TNG_CARD, OPEN_PAYMENT_CARD]
+    lane_layout:
+      - { lane: 1, methods: [RFID] }
+      - { lane: 2, methods: [SMARTTAG] }
+      - { lane: 3, methods: [TNG_CARD, OPEN_PAYMENT_CARD] }
+
+  - gantry_id: MY-DUKE-BATU
+    corridor_id: MY-DUKE
+    external_code: DUKE-01
+    name: Plaza Tol Batu (DUKE)
+    role: open_plaza
+    direction_code: BOTH
+    direction_bearing: null
+    tripwire_half_width_m: 55
+    lat: 3.21024
+    lon: 101.68191
+    accepted_payments: [RFID, SMARTTAG, TNG_CARD, OPEN_PAYMENT_CARD]
+    lane_layout:
+      - { lane: 1, methods: [RFID] }
+      - { lane: 2, methods: [SMARTTAG] }
+      - { lane: 3, methods: [TNG_CARD, OPEN_PAYMENT_CARD] }
+
+  - gantry_id: MY-DUKE-SENTUL_PASAR
+    corridor_id: MY-DUKE
+    external_code: DUKE-02
+    name: Plaza Tol Sentul Pasar (DUKE)
+    role: open_plaza
+    direction_code: BOTH
+    direction_bearing: null
+    tripwire_half_width_m: 55
+    lat: 3.19592
+    lon: 101.69975
+    accepted_payments: [RFID, SMARTTAG, TNG_CARD, OPEN_PAYMENT_CARD]
+    lane_layout:
+      - { lane: 1, methods: [RFID] }
+      - { lane: 2, methods: [SMARTTAG] }
+      - { lane: 3, methods: [TNG_CARD, OPEN_PAYMENT_CARD] }
+
+  - gantry_id: MY-KESAS-AWAN_BESAR
+    corridor_id: MY-KESAS
+    external_code: KESAS-01
+    name: Plaza Tol Awan Besar (KESAS)
+    role: open_plaza
+    direction_code: BOTH
+    direction_bearing: null
+    tripwire_half_width_m: 55
+    lat: 3.05988
+    lon: 101.67542
+    accepted_payments: [RFID, SMARTTAG, TNG_CARD, OPEN_PAYMENT_CARD]
+    lane_layout:
+      - { lane: 1, methods: [RFID] }
+      - { lane: 2, methods: [SMARTTAG] }
+      - { lane: 3, methods: [TNG_CARD, OPEN_PAYMENT_CARD] }
+
+  - gantry_id: MY-AKLEH-DATO_KERAMAT
+    corridor_id: MY-AKLEH
+    external_code: AKLEH-01
+    name: Plaza Tol Dato Keramat (AKLEH)
+    role: open_plaza
+    direction_code: BOTH
+    direction_bearing: null
+    tripwire_half_width_m: 45
+    lat: 3.16278
+    lon: 101.73475
+    accepted_payments: [RFID, SMARTTAG, TNG_CARD, OPEN_PAYMENT_CARD]
+    lane_layout:
+      - { lane: 1, methods: [RFID] }
+      - { lane: 2, methods: [SMARTTAG] }
+      - { lane: 3, methods: [TNG_CARD, OPEN_PAYMENT_CARD] }
+
+  - gantry_id: MY-SUKE-BUKIT_TERATAI
+    corridor_id: MY-SUKE
+    external_code: SUKE-01
+    name: Plaza Tol Bukit Teratai (SUKE)
+    role: open_plaza
+    direction_code: BOTH
+    direction_bearing: null
+    tripwire_half_width_m: 45
+    lat: 3.11284
+    lon: 101.76642
+    accepted_payments: [RFID, SMARTTAG, TNG_CARD, OPEN_PAYMENT_CARD]
+    lane_layout:
+      - { lane: 1, methods: [RFID] }
+      - { lane: 2, methods: [SMARTTAG] }
+      - { lane: 3, methods: [TNG_CARD, OPEN_PAYMENT_CARD] }
+
+  - gantry_id: MY-PENANG-PERAI
+    corridor_id: MY-PENANG-BRIDGE
+    external_code: PB-01
+    name: Plaza Tol Jambatan Pulau Pinang (Perai Westbound)
+    role: open_plaza
+    direction_code: WB
+    direction_bearing: 270
+    bearing_tolerance: 65
+    tripwire_half_width_m: 70
+    lat: 5.36766
+    lon: 100.39134
+    accepted_payments: [RFID, SMARTTAG, TNG_CARD, OPEN_PAYMENT_CARD]
+    lane_layout:
+      - { lane: 1, methods: [RFID] }
+      - { lane: 2, methods: [SMARTTAG] }
+      - { lane: 3, methods: [TNG_CARD, OPEN_PAYMENT_CARD] }
+
+  # ---------------------------------------------------------------------------
+  # MALAYSIA-SINGAPORE BORDER CHECKPOINTS (BSI CAUSEWAY & LINKEDUA)
+  # ---------------------------------------------------------------------------
+  - gantry_id: MY-CIQ-BSI-INBOUND
+    corridor_id: MY-BORDER-SG
+    external_code: CIQ-BSI-IN
+    name: Bangunan Sultan Iskandar CIQ (Johor Causeway — Inbound MY)
+    role: border_crossing
+    direction_code: NB
+    direction_bearing: 345
+    bearing_tolerance: 65
+    tripwire_half_width_m: 80
+    lat: 1.46148
+    lon: 103.76792
+    accepted_payments: [TNG_CARD, RFID]
+    lane_layout:
+      - { lane: 1, methods: [TNG_CARD, RFID] }
+
+  - gantry_id: MY-LINKEDUA-TG_KUPANG
+    corridor_id: MY-BORDER-SG
+    external_code: CIQ-LKD
+    name: Plaza Tol Tanjung Kupang (Second Link)
+    role: border_crossing
+    direction_code: BOTH
+    direction_bearing: null
+    tripwire_half_width_m: 75
+    lat: 1.37651
+    lon: 103.61194
+    accepted_payments: [RFID, SMARTTAG, TNG_CARD]
+    lane_layout:
+      - { lane: 1, methods: [RFID] }
+      - { lane: 2, methods: [TNG_CARD] }
+
+open_rates:
+  # LDP (Flat RM 2.10 Class 1, RM 4.20 Class 2, RM 6.30 Class 3, RM 1.60 Taxi, RM 1.60 Bus, RM 0.00 Motorcycle)
+  - { gantry_id: MY-LDP-PENCHALA, country_code: MY, vehicle_class: MY_C1, amount_minor: 210, currency_code: MYR }
+  - { gantry_id: MY-LDP-PENCHALA, country_code: MY, vehicle_class: MY_C2, amount_minor: 420, currency_code: MYR }
+  - { gantry_id: MY-LDP-PENCHALA, country_code: MY, vehicle_class: MY_C3, amount_minor: 630, currency_code: MYR }
+  - { gantry_id: MY-LDP-PENCHALA, country_code: MY, vehicle_class: MY_C4, amount_minor: 160, currency_code: MYR }
+  - { gantry_id: MY-LDP-PENCHALA, country_code: MY, vehicle_class: MY_C5, amount_minor: 160, currency_code: MYR }
+  - { gantry_id: MY-LDP-PENCHALA, country_code: MY, vehicle_class: MY_MC, amount_minor: 0,   currency_code: MYR }
+
+  - { gantry_id: MY-LDP-PJ, country_code: MY, vehicle_class: MY_C1, amount_minor: 210, currency_code: MYR }
+  - { gantry_id: MY-LDP-PJ, country_code: MY, vehicle_class: MY_C2, amount_minor: 420, currency_code: MYR }
+  - { gantry_id: MY-LDP-PJ, country_code: MY, vehicle_class: MY_C3, amount_minor: 630, currency_code: MYR }
+  - { gantry_id: MY-LDP-PJ, country_code: MY, vehicle_class: MY_C4, amount_minor: 160, currency_code: MYR }
+  - { gantry_id: MY-LDP-PJ, country_code: MY, vehicle_class: MY_C5, amount_minor: 160, currency_code: MYR }
+  - { gantry_id: MY-LDP-PJ, country_code: MY, vehicle_class: MY_MC, amount_minor: 0,   currency_code: MYR }
+
+  - { gantry_id: MY-LDP-PUCHONG_SELATAN, country_code: MY, vehicle_class: MY_C1, amount_minor: 210, currency_code: MYR }
+  - { gantry_id: MY-LDP-PUCHONG_SELATAN, country_code: MY, vehicle_class: MY_C2, amount_minor: 420, currency_code: MYR }
+  - { gantry_id: MY-LDP-PUCHONG_SELATAN, country_code: MY, vehicle_class: MY_C3, amount_minor: 630, currency_code: MYR }
+  - { gantry_id: MY-LDP-PUCHONG_SELATAN, country_code: MY, vehicle_class: MY_C4, amount_minor: 160, currency_code: MYR }
+  - { gantry_id: MY-LDP-PUCHONG_SELATAN, country_code: MY, vehicle_class: MY_C5, amount_minor: 160, currency_code: MYR }
+  - { gantry_id: MY-LDP-PUCHONG_SELATAN, country_code: MY, vehicle_class: MY_MC, amount_minor: 0,   currency_code: MYR }
+
+  # SPRINT
+  - { gantry_id: MY-SPRINT-DAMANSARA, country_code: MY, vehicle_class: MY_C1, amount_minor: 200, currency_code: MYR }
+  - { gantry_id: MY-SPRINT-DAMANSARA, country_code: MY, vehicle_class: MY_C2, amount_minor: 400, currency_code: MYR }
+  - { gantry_id: MY-SPRINT-DAMANSARA, country_code: MY, vehicle_class: MY_C3, amount_minor: 600, currency_code: MYR }
+  - { gantry_id: MY-SPRINT-DAMANSARA, country_code: MY, vehicle_class: MY_C4, amount_minor: 100, currency_code: MYR }
+  - { gantry_id: MY-SPRINT-DAMANSARA, country_code: MY, vehicle_class: MY_C5, amount_minor: 150, currency_code: MYR }
+  - { gantry_id: MY-SPRINT-DAMANSARA, country_code: MY, vehicle_class: MY_MC, amount_minor: 0,   currency_code: MYR }
+
+  - { gantry_id: MY-SPRINT-PANTAI, country_code: MY, vehicle_class: MY_C1, amount_minor: 250, currency_code: MYR }
+  - { gantry_id: MY-SPRINT-PANTAI, country_code: MY, vehicle_class: MY_C2, amount_minor: 500, currency_code: MYR }
+  - { gantry_id: MY-SPRINT-PANTAI, country_code: MY, vehicle_class: MY_C3, amount_minor: 750, currency_code: MYR }
+  - { gantry_id: MY-SPRINT-PANTAI, country_code: MY, vehicle_class: MY_C4, amount_minor: 120, currency_code: MYR }
+  - { gantry_id: MY-SPRINT-PANTAI, country_code: MY, vehicle_class: MY_C5, amount_minor: 200, currency_code: MYR }
+  - { gantry_id: MY-SPRINT-PANTAI, country_code: MY, vehicle_class: MY_MC, amount_minor: 0,   currency_code: MYR }
+
+  # DUKE
+  - { gantry_id: MY-DUKE-BATU, country_code: MY, vehicle_class: MY_C1, amount_minor: 250, currency_code: MYR }
+  - { gantry_id: MY-DUKE-BATU, country_code: MY, vehicle_class: MY_C2, amount_minor: 380, currency_code: MYR }
+  - { gantry_id: MY-DUKE-BATU, country_code: MY, vehicle_class: MY_C3, amount_minor: 500, currency_code: MYR }
+  - { gantry_id: MY-DUKE-BATU, country_code: MY, vehicle_class: MY_C4, amount_minor: 130, currency_code: MYR }
+  - { gantry_id: MY-DUKE-BATU, country_code: MY, vehicle_class: MY_C5, amount_minor: 130, currency_code: MYR }
+  - { gantry_id: MY-DUKE-BATU, country_code: MY, vehicle_class: MY_MC, amount_minor: 0,   currency_code: MYR }
+
+  - { gantry_id: MY-DUKE-SENTUL_PASAR, country_code: MY, vehicle_class: MY_C1, amount_minor: 250, currency_code: MYR }
+  - { gantry_id: MY-DUKE-SENTUL_PASAR, country_code: MY, vehicle_class: MY_C2, amount_minor: 380, currency_code: MYR }
+  - { gantry_id: MY-DUKE-SENTUL_PASAR, country_code: MY, vehicle_class: MY_C3, amount_minor: 500, currency_code: MYR }
+  - { gantry_id: MY-DUKE-SENTUL_PASAR, country_code: MY, vehicle_class: MY_C4, amount_minor: 130, currency_code: MYR }
+  - { gantry_id: MY-DUKE-SENTUL_PASAR, country_code: MY, vehicle_class: MY_C5, amount_minor: 130, currency_code: MYR }
+  - { gantry_id: MY-DUKE-SENTUL_PASAR, country_code: MY, vehicle_class: MY_MC, amount_minor: 0,   currency_code: MYR }
+
+  # KESAS
+  - { gantry_id: MY-KESAS-AWAN_BESAR, country_code: MY, vehicle_class: MY_C1, amount_minor: 200, currency_code: MYR }
+  - { gantry_id: MY-KESAS-AWAN_BESAR, country_code: MY, vehicle_class: MY_C2, amount_minor: 300, currency_code: MYR }
+  - { gantry_id: MY-KESAS-AWAN_BESAR, country_code: MY, vehicle_class: MY_C3, amount_minor: 400, currency_code: MYR }
+  - { gantry_id: MY-KESAS-AWAN_BESAR, country_code: MY, vehicle_class: MY_C4, amount_minor: 100, currency_code: MYR }
+  - { gantry_id: MY-KESAS-AWAN_BESAR, country_code: MY, vehicle_class: MY_C5, amount_minor: 150, currency_code: MYR }
+  - { gantry_id: MY-KESAS-AWAN_BESAR, country_code: MY, vehicle_class: MY_MC, amount_minor: 0,   currency_code: MYR }
+
+  # AKLEH & SUKE
+  - { gantry_id: MY-AKLEH-DATO_KERAMAT, country_code: MY, vehicle_class: MY_C1, amount_minor: 213, currency_code: MYR }
+  - { gantry_id: MY-AKLEH-DATO_KERAMAT, country_code: MY, vehicle_class: MY_C2, amount_minor: 700, currency_code: MYR }
+  - { gantry_id: MY-AKLEH-DATO_KERAMAT, country_code: MY, vehicle_class: MY_C3, amount_minor: 600, currency_code: MYR }
+  - { gantry_id: MY-AKLEH-DATO_KERAMAT, country_code: MY, vehicle_class: MY_C4, amount_minor: 180, currency_code: MYR }
+  - { gantry_id: MY-AKLEH-DATO_KERAMAT, country_code: MY, vehicle_class: MY_C5, amount_minor: 150, currency_code: MYR }
+  - { gantry_id: MY-AKLEH-DATO_KERAMAT, country_code: MY, vehicle_class: MY_MC, amount_minor: 0,   currency_code: MYR }
+
+  - { gantry_id: MY-SUKE-BUKIT_TERATAI, country_code: MY, vehicle_class: MY_C1, amount_minor: 230, currency_code: MYR }
+  - { gantry_id: MY-SUKE-BUKIT_TERATAI, country_code: MY, vehicle_class: MY_C2, amount_minor: 460, currency_code: MYR }
+  - { gantry_id: MY-SUKE-BUKIT_TERATAI, country_code: MY, vehicle_class: MY_C3, amount_minor: 690, currency_code: MYR }
+  - { gantry_id: MY-SUKE-BUKIT_TERATAI, country_code: MY, vehicle_class: MY_C4, amount_minor: 230, currency_code: MYR }
+  - { gantry_id: MY-SUKE-BUKIT_TERATAI, country_code: MY, vehicle_class: MY_C5, amount_minor: 230, currency_code: MYR }
+  - { gantry_id: MY-SUKE-BUKIT_TERATAI, country_code: MY, vehicle_class: MY_MC, amount_minor: 0,   currency_code: MYR }
+
+  # Penang Bridge (Westbound Perai)
+  - { gantry_id: MY-PENANG-PERAI, country_code: MY, vehicle_class: MY_C1, amount_minor: 574, currency_code: MYR }
+  - { gantry_id: MY-PENANG-PERAI, country_code: MY, vehicle_class: MY_C2, amount_minor: 984, currency_code: MYR }
+  - { gantry_id: MY-PENANG-PERAI, country_code: MY, vehicle_class: MY_C3, amount_minor: 2050, currency_code: MYR }
+  - { gantry_id: MY-PENANG-PERAI, country_code: MY, vehicle_class: MY_C4, amount_minor: 574, currency_code: MYR }
+  - { gantry_id: MY-PENANG-PERAI, country_code: MY, vehicle_class: MY_C5, amount_minor: 984, currency_code: MYR }
+  - { gantry_id: MY-PENANG-PERAI, country_code: MY, vehicle_class: MY_MC, amount_minor: 0,   currency_code: MYR }
+
+  # Border CIQ (BSI Inbound MY: RM 20.00 Road Charge for foreign-registered private vehicles)
+  - { gantry_id: MY-CIQ-BSI-INBOUND, country_code: MY, vehicle_class: MY_C1, amount_minor: 0,    currency_code: MYR, foreign_vehicle_only: false }
+  - { gantry_id: MY-CIQ-BSI-INBOUND, country_code: MY, vehicle_class: MY_C1, amount_minor: 2000, currency_code: MYR, foreign_vehicle_only: true }
+  - { gantry_id: MY-LINKEDUA-TG_KUPANG, country_code: MY, vehicle_class: MY_C1, amount_minor: 614,  currency_code: MYR, foreign_vehicle_only: false }
+  - { gantry_id: MY-LINKEDUA-TG_KUPANG, country_code: MY, vehicle_class: MY_C1, amount_minor: 2000, currency_code: MYR, foreign_vehicle_only: true }

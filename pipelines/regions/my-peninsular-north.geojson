@@ -1,0 +1,22 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "region_id": "my-peninsular-north",
+        "name": "Malaysia North and East Coast"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [99.55, 2.65],
+          [104.25, 2.65],
+          [104.25, 6.80],
+          [99.55, 6.80],
+          [99.55, 2.65]
+        ]]
+      }
+    }
+  ]
+}

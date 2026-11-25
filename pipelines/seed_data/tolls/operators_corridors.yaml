@@ -1,0 +1,160 @@
+# Regional Toll Operators & Highway Corridors (MY / SG / BN)
+
+operators:
+  - operator_code: PLUS
+    name: PLUS Malaysia Berhad
+    country_code: MY
+    currency_code: MYR
+    website_url: https://www.plus.com.my
+
+  - operator_code: LITRAK
+    name: Lingkaran Trans Kota Sdn Bhd (LDP)
+    country_code: MY
+    currency_code: MYR
+    website_url: https://www.litrak.com.my
+
+  - operator_code: SPRINT
+    name: Sistem Penyuraian Trafik KL Barat (SPRINT)
+    country_code: MY
+    currency_code: MYR
+    website_url: https://www.sprint.com.my
+
+  - operator_code: DUKE
+    name: Konsortium Lebuhraya Utara-Timur KL (DUKE)
+    country_code: MY
+    currency_code: MYR
+    website_url: https://www.duke.com.my
+
+  - operator_code: KESAS
+    name: Kesas Sdn Bhd (Shah Alam Expressway)
+    country_code: MY
+    currency_code: MYR
+    website_url: https://www.kesas.com.my
+
+  - operator_code: PROLINTAS
+    name: Projek Lintasan Kota Holdings (AKLEH / SUKE / SPE / GCE)
+    country_code: MY
+    currency_code: MYR
+    website_url: https://www.prolintas.com.my
+
+  - operator_code: LTA_SG
+    name: Land Transport Authority (Singapore ERP)
+    country_code: SG
+    currency_code: SGD
+    website_url: https://www.lta.gov.sg
+
+  - operator_code: JKR_BN
+    name: Jabatan Kerja Raya Brunei Darussalam
+    country_code: BN
+    currency_code: BND
+    website_url: https://www.mod.gov.bn
+
+corridors:
+  - corridor_id: MY-PLUS-MAIN
+    operator_code: PLUS
+    highway_ref: E1/E2
+    name: North-South Expressway (NSE / NKVE / ELITE Closed Network)
+    system_type: closed_matrix
+    country_code: MY
+    notes: Distance-based closed toll system supporting TnG, SmartTAG, RFID, and PLUS JustGO ANPR.
+
+  - corridor_id: MY-LDP
+    operator_code: LITRAK
+    highway_ref: E11
+    name: Damansara-Puchong Expressway (LDP)
+    system_type: open_barrier
+    country_code: MY
+    notes: Open flat-rate urban toll expressway.
+
+  - corridor_id: MY-SPRINT
+    operator_code: SPRINT
+    highway_ref: E23
+    name: SPRINT Highway
+    system_type: open_barrier
+    country_code: MY
+    notes: Open flat-rate expressway serving Damansara, Pantai, and Bukit Kiara.
+
+  - corridor_id: MY-DUKE
+    operator_code: DUKE
+    highway_ref: E33
+    name: Duta-Ulu Kelang Expressway (DUKE)
+    system_type: open_barrier
+    country_code: MY
+    notes: Open flat-rate urban expressway.
+
+  - corridor_id: MY-KESAS
+    operator_code: KESAS
+    highway_ref: E5
+    name: Shah Alam Expressway (KESAS)
+    system_type: open_barrier
+    country_code: MY
+    notes: Open flat-rate east-west Klang Valley expressway.
+
+  - corridor_id: MY-AKLEH
+    operator_code: PROLINTAS
+    highway_ref: E12
+    name: Ampang-Kuala Lumpur Elevated Highway (AKLEH)
+    system_type: open_barrier
+    country_code: MY
+    notes: Open flat-rate elevated highway into KLCC.
+
+  - corridor_id: MY-SUKE
+    operator_code: PROLINTAS
+    highway_ref: E19
+    name: Sungai Besi-Ulu Kelang Elevated Expressway (SUKE)
+    system_type: open_barrier
+    country_code: MY
+    notes: Open flat-rate eastern Klang Valley elevated expressway.
+
+  - corridor_id: MY-PENANG-BRIDGE
+    operator_code: PLUS
+    highway_ref: E36
+    name: Penang Bridge
+    system_type: open_barrier
+    country_code: MY
+    notes: One-way westbound mainland-to-island toll plaza at Perai.
+
+  - corridor_id: MY-BORDER-SG
+    operator_code: PLUS
+    highway_ref: E3/AH2
+    name: Malaysia-Singapore Border Checkpoints (BSI CIQ & Linkedua)
+    system_type: border_checkpoint
+    country_code: MY
+    notes: Border toll plus MY Road Charge (RM 20.00) for foreign-registered private vehicles entering Malaysia.
+
+  - corridor_id: SG-ERP-CTE
+    operator_code: LTA_SG
+    highway_ref: CTE
+    name: Central Expressway (CTE) ERP Corridor
+    system_type: time_varying_erp
+    country_code: SG
+    notes: Curated Singapore ERP schedule (live DataMall API excluded in Phase 1).
+
+  - corridor_id: SG-ERP-AYE
+    operator_code: LTA_SG
+    highway_ref: AYE
+    name: Ayer Rajah Expressway (AYE) ERP Corridor
+    system_type: time_varying_erp
+    country_code: SG
+
+  - corridor_id: SG-ERP-ECP
+    operator_code: LTA_SG
+    highway_ref: ECP
+    name: East Coast Parkway / MCE ERP Corridor
+    system_type: time_varying_erp
+    country_code: SG
+
+  - corridor_id: SG-ERP-CBD
+    operator_code: LTA_SG
+    highway_ref: CBD
+    name: Orchard / Marina / Nicoll Highway Cordon ERP
+    system_type: time_varying_erp
+    country_code: SG
+
+  - corridor_id: BN-RASAU
+    operator_code: JKR_BN
+    highway_ref: Rasau
+    name: Rasau / Sungai Teraban Toll Bridge
+    system_type: open_barrier
+    country_code: BN
+    notes: Belait district toll bridge connecting Kuala Belait toward Miri border (Sungai Tujoh).

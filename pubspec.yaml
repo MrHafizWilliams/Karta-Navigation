@@ -1,0 +1,14 @@
+name: karta_workspace
+publish_to: none
+
+environment:
+  sdk: ">=3.6.0 <4.0.0"
+
+workspace:
+  - apps/karta_app
+  - packages/karta_design_system
+  - packages/karta_api_client
+  - packages/karta_navigation_core
+  - packages/karta_map_engine
+  - packages/karta_offline_routing
+  - packages/karta_automotive_bridge

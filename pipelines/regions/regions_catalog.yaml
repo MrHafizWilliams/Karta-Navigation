@@ -1,0 +1,40 @@
+# Downloadable Offline Regional Packs for Karta (MY / SG / BN)
+# Each sub-region includes a ~5km overlap buffer along national/state corridors
+# to prevent edge clipping during offline cross-border routing.
+
+regions:
+  - region_id: my-peninsular-central
+    display_name: "Malaysia — Central (KL, Selangor, Putrajaya, N. Sembilan, Melaka)"
+    country_codes: ["MY"]
+    geojson: my-peninsular-central.geojson
+    bbox: [100.75, 2.05, 102.70, 3.90]
+
+  - region_id: my-peninsular-north
+    display_name: "Malaysia — North & East Coast (Penang, Perak, Kedah, Perlis, Kelantan, Terengganu, Pahang)"
+    country_codes: ["MY"]
+    geojson: my-peninsular-north.geojson
+    bbox: [99.55, 2.65, 104.25, 6.80]
+
+  - region_id: my-peninsular-south
+    display_name: "Malaysia — South (Johor & MY-SG Causeway/Second Link Buffer)"
+    country_codes: ["MY", "SG"]
+    geojson: my-peninsular-south.geojson
+    bbox: [102.45, 1.20, 104.55, 2.85]
+
+  - region_id: my-borneo
+    display_name: "Malaysia — Borneo (Sabah, Sarawak, Labuan & Brunei Transit Buffer)"
+    country_codes: ["MY", "BN"]
+    geojson: my-borneo.geojson
+    bbox: [109.50, 0.85, 119.40, 7.45]
+
+  - region_id: sg
+    display_name: "Singapore (Island-wide & Woodlands/Tuas Checkpoint Buffer)"
+    country_codes: ["SG", "MY"]
+    geojson: sg.geojson
+    bbox: [103.56, 1.14, 104.12, 1.52]
+
+  - region_id: bn
+    display_name: "Brunei Darussalam (Incl. Temburong & Miri/Limbang Border Buffer)"
+    country_codes: ["BN", "MY"]
+    geojson: bn.geojson
+    bbox: [113.95, 3.95, 115.45, 5.15]

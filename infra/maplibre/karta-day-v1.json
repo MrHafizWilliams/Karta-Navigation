@@ -1,0 +1,509 @@
+{
+  "version": 8,
+  "name": "Karta Tropical Daylight 3D Automotive v1",
+  "metadata": {
+    "karta:schema": "openmaptiles",
+    "karta:lighting_mode": "tropicalDaylight",
+    "karta:palette": {
+      "background_primary": "#F5F2EB",
+      "surface_card": "#FCFBF8",
+      "accent_primary": "#2F756F",
+      "text_primary": "#11161C",
+      "text_secondary": "#4B5663"
+    }
+  },
+  "light": {
+    "anchor": "viewport",
+    "color": "#FFFDF5",
+    "intensity": 0.56,
+    "position": [1.25, 195, 52]
+  },
+  "sources": {
+    "karta_basemap": {
+      "type": "vector",
+      "url": "http://localhost:8081/my-sg-bn-full.json",
+      "attribution": "OpenStreetMap contributors | Karta Navigation"
+    }
+  },
+  "glyphs": "https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf",
+  "layers": [
+    {
+      "id": "background",
+      "type": "background",
+      "paint": {
+        "background-color": "#F5F2EB"
+      }
+    },
+    {
+      "id": "landcover_highland",
+      "type": "fill",
+      "source": "karta_basemap",
+      "source-layer": "landcover",
+      "filter": ["in", "class", "wood", "rock", "sand"],
+      "paint": {
+        "fill-color": [
+          "match",
+          ["get", "class"],
+          "rock", "#DFDCD3",
+          "wood", "#DCE8DF",
+          "#EDE8DA"
+        ],
+        "fill-opacity": 0.84
+      }
+    },
+    {
+      "id": "landcover_grass",
+      "type": "fill",
+      "source": "karta_basemap",
+      "source-layer": "landcover",
+      "filter": ["in", "class", "grass", "wetland"],
+      "paint": {
+        "fill-color": "#E2EDE4",
+        "fill-opacity": 0.78
+      }
+    },
+    {
+      "id": "park",
+      "type": "fill",
+      "source": "karta_basemap",
+      "source-layer": "park",
+      "paint": {
+        "fill-color": "#D4E6D9",
+        "fill-opacity": 0.88
+      }
+    },
+    {
+      "id": "landuse_urban",
+      "type": "fill",
+      "source": "karta_basemap",
+      "source-layer": "landuse",
+      "filter": ["in", "class", "residential", "commercial", "industrial", "retail", "suburb"],
+      "paint": {
+        "fill-color": "#EFECE3",
+        "fill-opacity": 0.72
+      }
+    },
+    {
+      "id": "water",
+      "type": "fill",
+      "source": "karta_basemap",
+      "source-layer": "water",
+      "paint": {
+        "fill-color": "#C9E0EA"
+      }
+    },
+    {
+      "id": "water_outline",
+      "type": "line",
+      "source": "karta_basemap",
+      "source-layer": "water",
+      "paint": {
+        "line-color": "#94B8C8",
+        "line-width": 1.1
+      }
+    },
+    {
+      "id": "waterway",
+      "type": "line",
+      "source": "karta_basemap",
+      "source-layer": "waterway",
+      "paint": {
+        "line-color": "#AED0DF",
+        "line-width": ["interpolate", ["linear"], ["zoom"], 8, 0.8, 15, 3.6]
+      }
+    },
+    {
+      "id": "aeroway_runway",
+      "type": "line",
+      "source": "karta_basemap",
+      "source-layer": "aeroway",
+      "filter": ["==", "class", "runway"],
+      "paint": {
+        "line-color": "#CDD4DC",
+        "line-width": ["interpolate", ["exponential", 1.5], ["zoom"], 10, 2.2, 16, 20]
+      }
+    },
+    {
+      "id": "roads_minor_casing",
+      "type": "line",
+      "source": "karta_basemap",
+      "source-layer": "transportation",
+      "minzoom": 11,
+      "filter": ["in", "class", "minor", "service", "track", "path", "street"],
+      "layout": {
+        "line-cap": "round",
+        "line-join": "round"
+      },
+      "paint": {
+        "line-color": "#C7C2B7",
+        "line-width": ["interpolate", ["exponential", 1.5], ["zoom"], 11, 1.4, 15, 5.4, 18, 13.0]
+      }
+    },
+    {
+      "id": "roads_minor",
+      "type": "line",
+      "source": "karta_basemap",
+      "source-layer": "transportation",
+      "minzoom": 11,
+      "filter": ["in", "class", "minor", "service", "track", "path", "street"],
+      "layout": {
+        "line-cap": "round",
+        "line-join": "round"
+      },
+      "paint": {
+        "line-color": "#FFFFFF",
+        "line-width": ["interpolate", ["exponential", 1.5], ["zoom"], 11, 0.7, 15, 3.6, 18, 10.2]
+      }
+    },
+    {
+      "id": "roads_secondary_casing",
+      "type": "line",
+      "source": "karta_basemap",
+      "source-layer": "transportation",
+      "minzoom": 8,
+      "filter": ["in", "class", "secondary", "tertiary"],
+      "layout": {
+        "line-cap": "round",
+        "line-join": "round"
+      },
+      "paint": {
+        "line-color": "#9AA6B3",
+        "line-width": ["interpolate", ["exponential", 1.5], ["zoom"], 8, 1.8, 14, 6.8, 17, 15.8]
+      }
+    },
+    {
+      "id": "roads_secondary",
+      "type": "line",
+      "source": "karta_basemap",
+      "source-layer": "transportation",
+      "minzoom": 8,
+      "filter": ["in", "class", "secondary", "tertiary"],
+      "layout": {
+        "line-cap": "round",
+        "line-join": "round"
+      },
+      "paint": {
+        "line-color": "#FFFDF8",
+        "line-width": ["interpolate", ["exponential", 1.5], ["zoom"], 8, 0.8, 14, 4.4, 17, 12.2]
+      }
+    },
+    {
+      "id": "roads_primary_casing",
+      "type": "line",
+      "source": "karta_basemap",
+      "source-layer": "transportation",
+      "minzoom": 6,
+      "filter": ["in", "class", "primary", "trunk"],
+      "layout": {
+        "line-cap": "round",
+        "line-join": "round"
+      },
+      "paint": {
+        "line-color": "#647486",
+        "line-width": ["interpolate", ["exponential", 1.5], ["zoom"], 6, 2.2, 14, 8.6, 17, 18.6]
+      }
+    },
+    {
+      "id": "roads_primary",
+      "type": "line",
+      "source": "karta_basemap",
+      "source-layer": "transportation",
+      "minzoom": 6,
+      "filter": ["in", "class", "primary", "trunk"],
+      "layout": {
+        "line-cap": "round",
+        "line-join": "round"
+      },
+      "paint": {
+        "line-color": "#FCEFD8",
+        "line-width": ["interpolate", ["exponential", 1.5], ["zoom"], 6, 1.0, 14, 5.8, 17, 14.4]
+      }
+    },
+    {
+      "id": "roads_motorway_casing",
+      "type": "line",
+      "source": "karta_basemap",
+      "source-layer": "transportation",
+      "filter": ["==", "class", "motorway"],
+      "layout": {
+        "line-cap": "round",
+        "line-join": "round"
+      },
+      "paint": {
+        "line-color": "#163834",
+        "line-width": ["interpolate", ["exponential", 1.5], ["zoom"], 5, 3.0, 12, 8.2, 17, 21.0]
+      }
+    },
+    {
+      "id": "roads_motorway",
+      "type": "line",
+      "source": "karta_basemap",
+      "source-layer": "transportation",
+      "filter": ["==", "class", "motorway"],
+      "layout": {
+        "line-cap": "round",
+        "line-join": "round"
+      },
+      "paint": {
+        "line-color": "#2F756F",
+        "line-opacity": 0.94,
+        "line-width": ["interpolate", ["exponential", 1.5], ["zoom"], 5, 1.4, 12, 5.0, 17, 15.6]
+      }
+    },
+    {
+      "id": "buildings_footprint",
+      "type": "fill",
+      "source": "karta_basemap",
+      "source-layer": "building",
+      "minzoom": 12.0,
+      "paint": {
+        "fill-color": "#E5E1D7",
+        "fill-outline-color": "#C4BFB3",
+        "fill-opacity": 0.9
+      }
+    },
+    {
+      "id": "buildings_3d",
+      "type": "fill-extrusion",
+      "source": "karta_basemap",
+      "source-layer": "building",
+      "minzoom": 13.0,
+      "filter": ["!=", ["get", "hide_3d"], true],
+      "paint": {
+        "fill-extrusion-color": [
+          "interpolate",
+          ["linear"],
+          ["coalesce", ["get", "render_height"], ["get", "height"], 14],
+          0, "#E7E4DC",
+          35, "#D9E0DE",
+          90, "#C3D4D2",
+          180, "#97BCB8",
+          320, "#5B9A94",
+          450, "#2F756F"
+        ],
+        "fill-extrusion-height": [
+          "interpolate",
+          ["linear"],
+          ["zoom"],
+          13.0, 0,
+          13.8, ["coalesce", ["get", "render_height"], ["get", "height"], 14]
+        ],
+        "fill-extrusion-base": [
+          "interpolate",
+          ["linear"],
+          ["zoom"],
+          13.0, 0,
+          13.8, ["coalesce", ["get", "render_min_height"], ["get", "min_height"], 0]
+        ],
+        "fill-extrusion-opacity": 0.92,
+        "fill-extrusion-vertical-gradient": true
+      }
+    },
+    {
+      "id": "boundaries_state",
+      "type": "line",
+      "source": "karta_basemap",
+      "source-layer": "boundary",
+      "minzoom": 5,
+      "filter": ["all", ["==", "admin_level", 4], ["!=", "maritime", 1]],
+      "paint": {
+        "line-color": "#94A0AD",
+        "line-dasharray": [3, 3],
+        "line-width": 1.1
+      }
+    },
+    {
+      "id": "boundaries_country",
+      "type": "line",
+      "source": "karta_basemap",
+      "source-layer": "boundary",
+      "filter": ["all", ["==", "admin_level", 2], ["!=", "maritime", 1]],
+      "paint": {
+        "line-color": "#455362",
+        "line-dasharray": [4, 2],
+        "line-width": 1.7
+      }
+    },
+    {
+      "id": "mountain_peaks_label",
+      "type": "symbol",
+      "source": "karta_basemap",
+      "source-layer": "mountain_peak",
+      "minzoom": 9,
+      "layout": {
+        "text-field": [
+          "case",
+          ["has", "ele"],
+          ["concat", "▲ ", ["coalesce", ["get", "name:en"], ["get", "name"]], "\n", ["to-string", ["get", "ele"]], "m"],
+          ["concat", "▲ ", ["coalesce", ["get", "name:en"], ["get", "name"]]]
+        ],
+        "text-font": ["Noto Sans Regular"],
+        "text-size": ["interpolate", ["linear"], ["zoom"], 9, 9.5, 13, 11.5],
+        "text-max-width": 8
+      },
+      "paint": {
+        "text-color": "#485958",
+        "text-halo-color": "#F5F2EB",
+        "text-halo-width": 1.8
+      }
+    },
+    {
+      "id": "water_name",
+      "type": "symbol",
+      "source": "karta_basemap",
+      "source-layer": "water_name",
+      "minzoom": 7,
+      "layout": {
+        "text-field": ["coalesce", ["get", "name:en"], ["get", "name"]],
+        "text-font": ["Noto Sans Regular"],
+        "text-size": ["interpolate", ["linear"], ["zoom"], 7, 10.5, 14, 13.5]
+      },
+      "paint": {
+        "text-color": "#2F6C85",
+        "text-halo-color": "#D9EDF5",
+        "text-halo-width": 1.5
+      }
+    },
+    {
+      "id": "building_housenumber",
+      "type": "symbol",
+      "source": "karta_basemap",
+      "source-layer": "housenumber",
+      "minzoom": 16.0,
+      "layout": {
+        "text-field": ["get", "housenumber"],
+        "text-font": ["Noto Sans Regular"],
+        "text-size": 10.0
+      },
+      "paint": {
+        "text-color": "#4A5563",
+        "text-halo-color": "#FCFBF8",
+        "text-halo-width": 1.3
+      }
+    },
+    {
+      "id": "roads_label_minor",
+      "type": "symbol",
+      "source": "karta_basemap",
+      "source-layer": "transportation_name",
+      "minzoom": 12.2,
+      "filter": ["in", "class", "minor", "service", "track", "path", "street", "tertiary"],
+      "layout": {
+        "symbol-placement": "line",
+        "text-field": ["coalesce", ["get", "name:en"], ["get", "name"], ["get", "ref"]],
+        "text-font": ["Noto Sans Regular"],
+        "text-size": ["interpolate", ["linear"], ["zoom"], 12.2, 10.0, 16, 12.2]
+      },
+      "paint": {
+        "text-color": "#4A5563",
+        "text-halo-color": "#FCFBF8",
+        "text-halo-width": 1.8,
+        "text-opacity": 0.94,
+        "text-opacity-transition": { "duration": 380 }
+      }
+    },
+    {
+      "id": "roads_label_major",
+      "type": "symbol",
+      "source": "karta_basemap",
+      "source-layer": "transportation_name",
+      "minzoom": 9,
+      "filter": ["in", "class", "motorway", "trunk", "primary", "secondary"],
+      "layout": {
+        "symbol-placement": "line",
+        "text-field": ["coalesce", ["get", "name:en"], ["get", "name"], ["get", "ref"]],
+        "text-font": ["Open Sans Semibold"],
+        "text-size": ["interpolate", ["linear"], ["zoom"], 9, 10.5, 16, 13.5]
+      },
+      "paint": {
+        "text-color": "#11161C",
+        "text-halo-color": "#FCFBF8",
+        "text-halo-width": 2.0
+      }
+    },
+    {
+      "id": "roads_shield_number",
+      "type": "symbol",
+      "source": "karta_basemap",
+      "source-layer": "transportation_name",
+      "minzoom": 7,
+      "filter": ["has", "ref"],
+      "layout": {
+        "symbol-placement": "line",
+        "symbol-spacing": 280,
+        "text-field": ["get", "ref"],
+        "text-font": ["Open Sans Semibold"],
+        "text-size": 10.5,
+        "text-rotation-alignment": "viewport",
+        "text-pitch-alignment": "viewport"
+      },
+      "paint": {
+        "text-color": "#11161C",
+        "text-halo-color": "#F5C518",
+        "text-halo-width": 2.2
+      }
+    },
+    {
+      "id": "poi_landmarks",
+      "type": "symbol",
+      "source": "karta_basemap",
+      "source-layer": "poi",
+      "minzoom": 12.2,
+      "layout": {
+        "text-field": ["coalesce", ["get", "name:en"], ["get", "name"]],
+        "text-font": ["Open Sans Semibold"],
+        "text-size": ["interpolate", ["linear"], ["zoom"], 12.2, 10.0, 16, 12.0],
+        "text-max-width": 9
+      },
+      "paint": {
+        "text-color": "#22303C",
+        "text-halo-color": "#FCFBF8",
+        "text-halo-width": 1.8
+      }
+    },
+    {
+      "id": "place_suburb_neighbourhood",
+      "type": "symbol",
+      "source": "karta_basemap",
+      "source-layer": "place",
+      "minzoom": 10.5,
+      "filter": ["in", "class", "suburb", "neighbourhood", "quarter", "village", "hamlet", "locality", "isolated_dwelling"],
+      "layout": {
+        "text-field": ["coalesce", ["get", "name:en"], ["get", "name"]],
+        "text-font": ["Noto Sans Regular"],
+        "text-size": ["interpolate", ["linear"], ["zoom"], 10.5, 10.5, 15, 13.0],
+        "text-max-width": 8
+      },
+      "paint": {
+        "text-color": "#4A5563",
+        "text-halo-color": "#F5F2EB",
+        "text-halo-width": 1.9
+      }
+    },
+    {
+      "id": "places_label",
+      "type": "symbol",
+      "source": "karta_basemap",
+      "source-layer": "place",
+      "filter": ["in", "class", "country", "state", "city", "town", "suburb"],
+      "layout": {
+        "text-field": ["coalesce", ["get", "name:en"], ["get", "name"]],
+        "text-font": ["Open Sans Semibold"],
+        "text-size": [
+          "match",
+          ["get", "class"],
+          "country", 15.5,
+          "city", 14.5,
+          "town", 12.5,
+          11.5
+        ],
+        "text-max-width": 8
+      },
+      "paint": {
+        "text-color": "#11161C",
+        "text-halo-color": "#F5F2EB",
+        "text-halo-width": 2.1
+      }
+    }
+  ]
+}

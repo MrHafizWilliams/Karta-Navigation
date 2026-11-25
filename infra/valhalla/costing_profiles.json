@@ -1,0 +1,134 @@
+{
+  "version": "1.0.0",
+  "region": "MY-SG-BN",
+  "profiles": {
+    "drive_fastest": {
+      "display_name": "Fastest Driving",
+      "valhalla_costing": "auto",
+      "supports_tolls": true,
+      "default_alternates": 2,
+      "costing_options": {
+        "auto": {
+          "use_highways": 1.0,
+          "use_tolls": 0.75,
+          "toll_booth_cost": 15,
+          "toll_booth_penalty": 0,
+          "use_ferry": 0.5,
+          "use_living_streets": 0.1,
+          "use_tracks": 0.0,
+          "maneuver_penalty": 5,
+          "country_crossing_cost": 900,
+          "country_crossing_penalty": 0,
+          "speed_types": ["current", "predicted", "constrained", "freeflow"]
+        }
+      }
+    },
+    "drive_avoid_tolls": {
+      "display_name": "Avoid Tolls",
+      "valhalla_costing": "auto",
+      "supports_tolls": true,
+      "default_alternates": 1,
+      "costing_options": {
+        "auto": {
+          "use_highways": 0.55,
+          "use_tolls": 0.0,
+          "toll_booth_cost": 300,
+          "toll_booth_penalty": 3600,
+          "use_ferry": 0.4,
+          "use_living_streets": 0.1,
+          "use_tracks": 0.0,
+          "maneuver_penalty": 5,
+          "country_crossing_cost": 900,
+          "speed_types": ["current", "predicted", "constrained", "freeflow"]
+        }
+      }
+    },
+    "drive_no_highways": {
+      "display_name": "Avoid Highways",
+      "valhalla_costing": "auto",
+      "supports_tolls": true,
+      "default_alternates": 1,
+      "costing_options": {
+        "auto": {
+          "use_highways": 0.0,
+          "use_tolls": 0.0,
+          "toll_booth_cost": 300,
+          "toll_booth_penalty": 1800,
+          "use_ferry": 0.5,
+          "use_living_streets": 0.2,
+          "use_tracks": 0.0,
+          "country_crossing_cost": 900,
+          "speed_types": ["current", "predicted", "constrained", "freeflow"]
+        }
+      }
+    },
+    "drive_motorcycle": {
+      "display_name": "Motorcycle",
+      "valhalla_costing": "motorcycle",
+      "supports_tolls": true,
+      "default_alternates": 2,
+      "costing_options": {
+        "motorcycle": {
+          "use_highways": 0.85,
+          "use_tolls": 0.9,
+          "use_trails": 0.0,
+          "use_ferry": 0.5,
+          "country_crossing_cost": 600,
+          "speed_types": ["current", "predicted", "constrained", "freeflow"]
+        }
+      }
+    },
+    "walk": {
+      "display_name": "Walking",
+      "valhalla_costing": "pedestrian",
+      "supports_tolls": false,
+      "default_alternates": 1,
+      "costing_options": {
+        "pedestrian": {
+          "walking_speed": 5.1,
+          "walkway_factor": 0.9,
+          "sidewalk_factor": 0.95,
+          "alley_factor": 2.0,
+          "driveway_factor": 5.0,
+          "use_lit": 0.65,
+          "use_hills": 0.4,
+          "step_penalty": 20
+        }
+      }
+    },
+    "cycle": {
+      "display_name": "Cycling",
+      "valhalla_costing": "bicycle",
+      "supports_tolls": false,
+      "default_alternates": 1,
+      "costing_options": {
+        "bicycle": {
+          "bicycle_type": "Hybrid",
+          "cycling_speed": 18.0,
+          "use_roads": 0.35,
+          "use_hills": 0.4,
+          "avoid_bad_surfaces": 0.5,
+          "use_ferry": 0.3
+        }
+      }
+    },
+    "transit": {
+      "display_name": "Public Transit (RapidKL / LTA)",
+      "valhalla_costing": "multimodal",
+      "supports_tolls": false,
+      "default_alternates": 2,
+      "costing_options": {
+        "transit": {
+          "use_bus": 0.7,
+          "use_rail": 1.0,
+          "use_transfers": 0.4
+        },
+        "pedestrian": {
+          "walking_speed": 5.0,
+          "use_lit": 0.65,
+          "max_transit_walking_distance": 1500
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,132 @@
+# Singapore ERP Gantries & Curated Time-of-Day Schedules (Asia/Singapore)
+# Note: Live LTA DataMall API polling is intentionally excluded in Phase 1.
+# Amounts are in SGD cents (100 = $1.00). Motorcycles (SG_MC) are 50% of SG_PC.
+
+gantries:
+  - gantry_id: SG-ERP-31-CTE-BRADDELL
+    corridor_id: SG-ERP-CTE
+    external_code: "31"
+    name: CTE Southbound before Braddell Road (ERP Gantry 31)
+    role: erp_gantry
+    direction_code: SB
+    direction_bearing: 195
+    bearing_tolerance: 50
+    tripwire_half_width_m: 35
+    lat: 1.34692
+    lon: 103.85823
+    accepted_payments: [ERP_IU, ERP2_OBU]
+    lane_layout:
+      - { lane: 1, methods: [ERP_IU, ERP2_OBU] }
+      - { lane: 2, methods: [ERP_IU, ERP2_OBU] }
+      - { lane: 3, methods: [ERP_IU, ERP2_OBU] }
+
+  - gantry_id: SG-ERP-35-CTE-MOULMEIN
+    corridor_id: SG-ERP-CTE
+    external_code: "35"
+    name: CTE Northbound after PIE / Moulmein (ERP Gantry 35)
+    role: erp_gantry
+    direction_code: NB
+    direction_bearing: 15
+    bearing_tolerance: 50
+    tripwire_half_width_m: 35
+    lat: 1.32645
+    lon: 103.85685
+    accepted_payments: [ERP_IU, ERP2_OBU]
+    lane_layout:
+      - { lane: 1, methods: [ERP_IU, ERP2_OBU] }
+      - { lane: 2, methods: [ERP_IU, ERP2_OBU] }
+
+  - gantry_id: SG-ERP-52-AYE-CLEMENTI
+    corridor_id: SG-ERP-AYE
+    external_code: "52"
+    name: AYE Eastbound after Jurong Town Hall / Clementi (ERP Gantry 52)
+    role: erp_gantry
+    direction_code: EB
+    direction_bearing: 115
+    bearing_tolerance: 50
+    tripwire_half_width_m: 35
+    lat: 1.31861
+    lon: 103.75824
+    accepted_payments: [ERP_IU, ERP2_OBU]
+    lane_layout:
+      - { lane: 1, methods: [ERP_IU, ERP2_OBU] }
+      - { lane: 2, methods: [ERP_IU, ERP2_OBU] }
+
+  - gantry_id: SG-ERP-30-ECP-FORT
+    corridor_id: SG-ERP-ECP
+    external_code: "30"
+    name: ECP Citybound at Fort Road (ERP Gantry 30)
+    role: erp_gantry
+    direction_code: WB
+    direction_bearing: 265
+    bearing_tolerance: 50
+    tripwire_half_width_m: 35
+    lat: 1.29591
+    lon: 103.88378
+    accepted_payments: [ERP_IU, ERP2_OBU]
+    lane_layout:
+      - { lane: 1, methods: [ERP_IU, ERP2_OBU] }
+      - { lane: 2, methods: [ERP_IU, ERP2_OBU] }
+
+  - gantry_id: SG-ERP-03-NICOLL
+    corridor_id: SG-ERP-CBD
+    external_code: "03"
+    name: Nicoll Highway Citybound (ERP Gantry 03)
+    role: erp_gantry
+    direction_code: SW
+    direction_bearing: 220
+    bearing_tolerance: 50
+    tripwire_half_width_m: 30
+    lat: 1.29811
+    lon: 103.86175
+    accepted_payments: [ERP_IU, ERP2_OBU]
+    lane_layout:
+      - { lane: 1, methods: [ERP_IU, ERP2_OBU] }
+      - { lane: 2, methods: [ERP_IU, ERP2_OBU] }
+
+  - gantry_id: SG-ERP-21-ORCHARD
+    corridor_id: SG-ERP-CBD
+    external_code: "21"
+    name: Orchard Road Cordon (ERP Gantry 21)
+    role: erp_gantry
+    direction_code: SE
+    direction_bearing: 130
+    bearing_tolerance: 50
+    tripwire_half_width_m: 30
+    lat: 1.30464
+    lon: 103.83184
+    accepted_payments: [ERP_IU, ERP2_OBU]
+    lane_layout:
+      - { lane: 1, methods: [ERP_IU, ERP2_OBU] }
+      - { lane: 2, methods: [ERP_IU, ERP2_OBU] }
+
+schedules:
+  # CTE Southbound Morning Peak (Mon-Fri)
+  - { gantry_id: SG-ERP-31-CTE-BRADDELL, day_type: WEEKDAY, start_time: "07:30", end_time: "08:00", sg_pc_cents: 100 }
+  - { gantry_id: SG-ERP-31-CTE-BRADDELL, day_type: WEEKDAY, start_time: "08:00", end_time: "08:30", sg_pc_cents: 200 }
+  - { gantry_id: SG-ERP-31-CTE-BRADDELL, day_type: WEEKDAY, start_time: "08:30", end_time: "09:00", sg_pc_cents: 300 }
+  - { gantry_id: SG-ERP-31-CTE-BRADDELL, day_type: WEEKDAY, start_time: "09:00", end_time: "09:30", sg_pc_cents: 200 }
+  - { gantry_id: SG-ERP-31-CTE-BRADDELL, day_type: WEEKDAY, start_time: "09:30", end_time: "10:00", sg_pc_cents: 100 }
+
+  # CTE Northbound Evening Peak (Mon-Fri)
+  - { gantry_id: SG-ERP-35-CTE-MOULMEIN, day_type: WEEKDAY, start_time: "17:30", end_time: "18:00", sg_pc_cents: 100 }
+  - { gantry_id: SG-ERP-35-CTE-MOULMEIN, day_type: WEEKDAY, start_time: "18:00", end_time: "19:00", sg_pc_cents: 200 }
+  - { gantry_id: SG-ERP-35-CTE-MOULMEIN, day_type: WEEKDAY, start_time: "19:00", end_time: "19:30", sg_pc_cents: 100 }
+
+  # AYE Eastbound Morning Peak
+  - { gantry_id: SG-ERP-52-AYE-CLEMENTI, day_type: WEEKDAY, start_time: "07:30", end_time: "08:00", sg_pc_cents: 100 }
+  - { gantry_id: SG-ERP-52-AYE-CLEMENTI, day_type: WEEKDAY, start_time: "08:00", end_time: "09:00", sg_pc_cents: 200 }
+  - { gantry_id: SG-ERP-52-AYE-CLEMENTI, day_type: WEEKDAY, start_time: "09:00", end_time: "09:30", sg_pc_cents: 100 }
+
+  # ECP Citybound Morning Peak
+  - { gantry_id: SG-ERP-30-ECP-FORT, day_type: WEEKDAY, start_time: "08:00", end_time: "08:30", sg_pc_cents: 100 }
+  - { gantry_id: SG-ERP-30-ECP-FORT, day_type: WEEKDAY, start_time: "08:30", end_time: "09:00", sg_pc_cents: 200 }
+  - { gantry_id: SG-ERP-30-ECP-FORT, day_type: WEEKDAY, start_time: "09:00", end_time: "09:30", sg_pc_cents: 100 }
+
+  # Nicoll Highway Citybound
+  - { gantry_id: SG-ERP-03-NICOLL, day_type: WEEKDAY, start_time: "08:00", end_time: "09:00", sg_pc_cents: 200 }
+  - { gantry_id: SG-ERP-03-NICOLL, day_type: WEEKDAY, start_time: "09:00", end_time: "09:30", sg_pc_cents: 100 }
+
+  # Orchard Cordon Evening
+  - { gantry_id: SG-ERP-21-ORCHARD, day_type: WEEKDAY, start_time: "17:30", end_time: "19:00", sg_pc_cents: 100 }
+  - { gantry_id: SG-ERP-21-ORCHARD, day_type: SATURDAY, start_time: "12:30", end_time: "17:30", sg_pc_cents: 100 }

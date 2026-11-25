@@ -1,0 +1,37 @@
+name: karta_app
+description: Karta Navigation Platform — Cross-Platform Dark-First 3D Navigation & Automotive Client (MY / SG / BN).
+publish_to: none
+version: 0.2.0+1
+
+environment:
+  sdk: ">=3.6.0 <4.0.0"
+  flutter: ">=3.24.0"
+
+resolution: workspace
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_riverpod: ^2.6.1
+  http: ^1.2.2
+  karta_api_client:
+    path: ../../packages/karta_api_client
+  karta_automotive_bridge:
+    path: ../../packages/karta_automotive_bridge
+  karta_design_system:
+    path: ../../packages/karta_design_system
+  karta_map_engine:
+    path: ../../packages/karta_map_engine
+  karta_navigation_core:
+    path: ../../packages/karta_navigation_core
+  karta_offline_routing:
+    path: ../../packages/karta_offline_routing
+  web: ^1.1.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true

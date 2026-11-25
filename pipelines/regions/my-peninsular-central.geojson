@@ -1,0 +1,22 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "region_id": "my-peninsular-central",
+        "name": "Malaysia Central (Klang Valley, Selangor, KL, Putrajaya, N. Sembilan, Melaka)"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [100.75, 2.05],
+          [102.70, 2.05],
+          [102.70, 3.90],
+          [100.75, 3.90],
+          [100.75, 2.05]
+        ]]
+      }
+    }
+  ]
+}
