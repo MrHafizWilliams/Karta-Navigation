@@ -9,6 +9,7 @@ import 'package:karta_navigation_core/karta_navigation_core.dart';
 import '../../services/live_location_platform.dart';
 import '../../state/auth_saved_places_providers.dart';
 import '../../state/karta_app_state.dart';
+import '../places/featured_place_info_card.dart';
 import '../routing/route_comparison_panel.dart';
 
 /// Unified Search Bar + Live Business POI & Landmark Results + Single-Destination
@@ -132,7 +133,8 @@ class _UnifiedNavigationPanelState extends ConsumerState<UnifiedNavigationPanel>
       });
       ref.read(kartaMapControllerProvider).setPois(merged);
     } catch (_) {
-      conn.recordNetworkFailure();
+      // Optional PostGIS POI search fallback when local Docker isn't running;
+      // keep live public Valhalla routing status unaffected.
       if (!mounted || seq != _searchSeq) return;
       setState(() => _isSearching = false);
     }
@@ -141,7 +143,9 @@ class _UnifiedNavigationPanelState extends ConsumerState<UnifiedNavigationPanel>
   @override
   Widget build(BuildContext context) {
     final palette = context.kartaPalette;
+    final l10n = context.kartaStrings;
     final planner = ref.watch(routePlannerProvider);
+    final selectedFeatured = ref.watch(selectedFeaturedPlaceProvider);
     final selectedPoi = ref.watch(selectedPoiProvider);
     final inspectedSpot = ref.watch(inspectedMapSpotProvider);
     final liveLoc = ref.watch(liveLocationProvider);
@@ -149,6 +153,9 @@ class _UnifiedNavigationPanelState extends ConsumerState<UnifiedNavigationPanel>
     final healthAsync = ref.watch(backendHealthProvider);
     final connSnap = ref.watch(connectivitySnapshotProvider).valueOrNull ??
         ref.read(connectivityResilienceProvider).current;
+    final isWideViewport =
+        KartaBreakpoints.resolve(MediaQuery.sizeOf(context).width) !=
+            KartaViewportClass.compact;
 
     return KartaSurfaceCard(
       padding: EdgeInsets.zero,
@@ -167,15 +174,15 @@ class _UnifiedNavigationPanelState extends ConsumerState<UnifiedNavigationPanel>
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: <Widget>[
                       Text(
-                        'Karta Navigation',
+                        l10n.appTitle,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: KartaTypography.sectionTitle.copyWith(color: palette.textPrimary),
                       ),
                       Text(
                         liveLoc.hasLiveFix
-                            ? (liveLoc.placeLabel ?? 'Live GPS Active')
-                            : 'Malaysia · Singapore · Brunei',
+                            ? (liveLoc.placeLabel ?? l10n.liveGpsActive)
+                            : 'Southeast Asia · 11 Countries',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: KartaTypography.bodySecondary.copyWith(color: palette.textSecondary),
@@ -197,7 +204,7 @@ class _UnifiedNavigationPanelState extends ConsumerState<UnifiedNavigationPanel>
                     data: (h) {
                       final ok = h != null && h.isHealthy;
                       return _StatusPill(
-                        label: ok ? 'LIVE' : 'READY',
+                        label: ok ? 'LIVE' : l10n.readyStatus,
                         color: ok ? palette.statusClear : palette.accentPrimary,
                       );
                     },
@@ -207,46 +214,35 @@ class _UnifiedNavigationPanelState extends ConsumerState<UnifiedNavigationPanel>
                       compact: true,
                     ),
                   ),
-                const SizedBox(width: 6),
-                Tooltip(
-                  message: authState.isAuthenticated
-                      ? '${authState.user!.displayName} (${authState.savedPlaces.length} saved places)'
-                      : 'Sign In / Register to save places & landmarks',
-                  child: InkWell(
-                    key: const ValueKey<String>('karta-header-account-btn'),
-                    onTap: () => ref.read(activeNavTabProvider.notifier).state = 'saved',
-                    borderRadius: BorderRadius.circular(999),
-                    child: Container(
-                      width: 34,
-                      height: 34,
-                      alignment: Alignment.center,
-                      decoration: BoxDecoration(
-                        color: authState.isAuthenticated
-                            ? palette.accentPrimary
-                            : palette.surfaceElevated,
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: authState.isAuthenticated
-                              ? palette.accentBright
-                              : palette.borderStrong,
+                if (isWideViewport) ...<Widget>[
+                  const SizedBox(width: 4),
+                  Tooltip(
+                    message: l10n.closeDirections,
+                    child: InkWell(
+                      key: const ValueKey<String>('karta-close-directions-btn'),
+                      onTap: () {
+                        ref.read(directionsDrawerOpenProvider.notifier).state = false;
+                        ref.read(routePlannerProvider.notifier).clearRoutes();
+                      },
+                      borderRadius: BorderRadius.circular(999),
+                      child: Container(
+                        width: 32,
+                        height: 32,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color: palette.surfaceElevated,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: palette.borderSubtle),
+                        ),
+                        child: Icon(
+                          Icons.close_rounded,
+                          size: 18,
+                          color: palette.textSecondary,
                         ),
                       ),
-                      child: authState.isAuthenticated
-                          ? Text(
-                              authState.user!.initials,
-                              style: KartaTypography.captionLabel.copyWith(
-                                color: Theme.of(context).colorScheme.onPrimary,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            )
-                          : Icon(
-                              Icons.person_outline_rounded,
-                              size: 18,
-                              color: palette.textPrimary,
-                            ),
                     ),
                   ),
-                ),
+                ],
               ],
             ),
           ),
@@ -259,7 +255,7 @@ class _UnifiedNavigationPanelState extends ConsumerState<UnifiedNavigationPanel>
               onChanged: _onQueryChanged,
               style: KartaTypography.bodyPrimary.copyWith(color: palette.textPrimary),
               decoration: InputDecoration(
-                hintText: 'Search places, landmarks, roads, KLCC...',
+                hintText: l10n.searchHint,
                 prefixIcon: Icon(Icons.search_rounded, color: palette.accentPrimary, size: 20),
                 suffixIcon: _isSearching
                     ? Padding(
@@ -413,6 +409,67 @@ class _UnifiedNavigationPanelState extends ConsumerState<UnifiedNavigationPanel>
                     ),
                   const SizedBox(height: 10),
                 ],
+
+                // 1b. Curated SEA Landmark / Airport / Sacred Site / Rail Station Guide Card
+                if (selectedFeatured != null)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: KartaFeaturedPlaceInfoCard(
+                      place: selectedFeatured,
+                      isSaved: authState.isCoordinateSaved(selectedFeatured.coordinate),
+                      onClose: () {
+                        ref.read(selectedFeaturedPlaceProvider.notifier).state = null;
+                        ref.read(kartaMapControllerProvider).setDroppedPin(coordinate: null);
+                      },
+                      onGoHere: () {
+                        ref.read(routePlannerProvider.notifier).setDestination(
+                              NamedWaypoint(
+                                id: selectedFeatured.id,
+                                label: selectedFeatured.name,
+                                subtitle: '${selectedFeatured.city} · ${selectedFeatured.countryName}',
+                                countryCode: selectedFeatured.countryCode,
+                                coordinate: selectedFeatured.coordinate,
+                              ),
+                            );
+                        ref.read(selectedFeaturedPlaceProvider.notifier).state = null;
+                        ref.read(routePlannerProvider.notifier).computeRoute();
+                      },
+                      onStartHere: () {
+                        ref.read(routePlannerProvider.notifier).setOrigin(
+                              NamedWaypoint(
+                                id: selectedFeatured.id,
+                                label: selectedFeatured.name,
+                                subtitle: '${selectedFeatured.city} · ${selectedFeatured.countryName}',
+                                countryCode: selectedFeatured.countryCode,
+                                coordinate: selectedFeatured.coordinate,
+                              ),
+                            );
+                        ref.read(selectedFeaturedPlaceProvider.notifier).state = null;
+                      },
+                      onSave: () async {
+                        if (!authState.isAuthenticated) {
+                          ref.read(activeNavTabProvider.notifier).state = 'saved';
+                          return;
+                        }
+                        await ref.read(authSavedPlacesProvider.notifier).savePlace(
+                              name: selectedFeatured.name,
+                              coordinate: selectedFeatured.coordinate,
+                              category: selectedFeatured.kind.filterGroup,
+                              addressSubtitle:
+                                  '${selectedFeatured.city} · ${selectedFeatured.countryName}',
+                              countryCode: selectedFeatured.countryCode,
+                            );
+                      },
+                      onLookAround: () {
+                        ref.read(lookAroundTargetProvider.notifier).state =
+                            StreetLookAroundTarget(
+                          coordinate: selectedFeatured.coordinate,
+                          title: selectedFeatured.name,
+                          subtitle: '${selectedFeatured.city} · ${selectedFeatured.countryName}',
+                        );
+                      },
+                    ),
+                  ),
 
                 // 2. Dropped Pin / Unknown Place Inspection Card (Google Maps tap-anywhere)
                 AnimatedSwitcher(

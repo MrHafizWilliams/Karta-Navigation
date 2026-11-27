@@ -39,81 +39,415 @@
    * 2. Falls back to direct `pmtiles://` HTTP range-request protocol if hosting
    *    raw `.pmtiles` archives on static storage / CDN.
    */
-  async function resolveVectorSource(inputUrl) {
-    const cleanHttpUrl = inputUrl.replace(/^pmtiles:\/\//, '');
-    const tileJsonUrl = cleanHttpUrl.endsWith('.json')
-      ? cleanHttpUrl
-      : cleanHttpUrl.replace(/\.pmtiles$/i, '.json');
-
+  /**
+   * Resolves the best live vector tile source covering all 8 Southeast Asian nations
+   * (MY, SG, BN, ID, TH, PH, VN, MM):
+   * 1. Probes local self-hosted merged ASEAN PMTiles TileJSON (`sea-full.json`) when running.
+   * 2. Connects to OpenFreeMap's live OpenMapTiles planet source (`https://tiles.openfreemap.org/planet`)
+   *    so Indonesia, Thailand, Philippines, Vietnam, Myanmar, Malaysia, Singapore & Brunei
+   *    render immediately on smartphones, desktops, and Web even when Docker is stopped.
+   * 3. Falls back to the configured local `my-sg-bn-full.json` or `pmtiles://` archive offline.
+   */
+  async function fetchJsonWithTimeout(url, timeoutMs) {
+    const ctrl = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    const timer = ctrl ? window.setTimeout(() => ctrl.abort(), timeoutMs) : null;
     try {
-      const resp = await fetch(tileJsonUrl, { method: 'GET', mode: 'cors' });
-      if (resp.ok) {
-        const meta = await resp.json();
-        const layers = Array.isArray(meta.vector_layers)
+      const resp = await fetch(url, {
+        method: 'GET',
+        mode: 'cors',
+        signal: ctrl ? ctrl.signal : undefined
+      });
+      if (!resp.ok) return null;
+      return await resp.json();
+    } catch (_) {
+      return null;
+    } finally {
+      if (timer) window.clearTimeout(timer);
+    }
+  }
+
+  const SEA_BOUNDS = [90.5, -12.8, 142.8, 29.2]; // Strict 11-nation Southeast Asia bounding box
+  const SEA_MAX_BOUNDS = [[90.5, -12.8], [142.8, 29.2]];
+
+  /**
+   * Inverted GeoJSON mask covering the entire world OUTSIDE the 11 Southeast Asian
+   * nations (MY, SG, BN, ID, PH, TH, LA, KH, VN, TL, MM) so neighboring non-SEA
+   * territories are visually masked while all 11 SEA countries shine in full 3D.
+   */
+  const SEA_OUTER_MASK_GEOJSON = {
+    type: 'FeatureCollection',
+    features: [
+      {
+        type: 'Feature',
+        properties: { role: 'sea_mask' },
+        geometry: {
+          type: 'Polygon',
+          coordinates: [
+            // Outer world ring (CCW)
+            [[-180, -85], [180, -85], [180, 85], [-180, 85], [-180, -85]],
+            // Inner cutout enclosing all 11 Southeast Asian nations (CW)
+            [
+              [92.0, 20.6],
+              [92.8, 24.5],
+              [96.0, 27.6],
+              [97.5, 28.65],
+              [98.85, 28.25],
+              [98.95, 25.0],
+              [99.85, 23.95],
+              [101.25, 21.55],
+              [101.85, 22.65],
+              [103.85, 22.85],
+              [105.4, 23.5],
+              [107.05, 22.95],
+              [108.15, 21.58],
+              [107.85, 19.65],
+              [109.65, 17.5],
+              [116.5, 19.5],
+              [120.2, 21.35],
+              [122.4, 21.35],
+              [126.95, 17.0],
+              [127.2, 5.2],
+              [134.5, 1.6],
+              [141.04, -2.4],
+              [141.04, -9.25],
+              [136.0, -10.6],
+              [127.6, -10.85],
+              [122.8, -11.35],
+              [114.0, -9.85],
+              [104.5, -7.9],
+              [97.0, -3.6],
+              [94.4, 5.95],
+              [92.0, 15.8],
+              [92.0, 20.6]
+            ]
+          ]
+        }
+      }
+    ]
+  };
+
+  function buildDirectVectorSource(meta, fallbackTileUrl) {
+    const layers = Array.isArray(meta.vector_layers)
+      ? meta.vector_layers.map(l => l.id)
+      : [];
+    const schema = (layers.includes('buildings') || layers.includes('roads'))
+      ? 'protomaps'
+      : 'openmaptiles';
+    const tileTemplate = Array.isArray(meta.tiles) && meta.tiles.length > 0
+      ? meta.tiles[0]
+      : fallbackTileUrl;
+    const minzoom = typeof meta.minzoom === 'number' ? meta.minzoom : 0;
+    const maxzoom = typeof meta.maxzoom === 'number' ? meta.maxzoom : 14;
+    const directSource = {
+      type: 'vector',
+      tiles: Array.isArray(meta.tiles) && meta.tiles.length > 0 ? meta.tiles : [tileTemplate],
+      minzoom,
+      maxzoom,
+      bounds: SEA_BOUNDS,
+      scheme: meta.scheme || 'xyz',
+      attribution: meta.attribution || 'OpenStreetMap contributors | Karta Southeast Asia'
+    };
+    return { schema, tileTemplate, pmtilesArchive: null, sourceConfig: directSource };
+  }
+
+  async function resolveVectorSource(inputUrl) {
+    const cleanHttpUrl = (inputUrl || '').replace(/^pmtiles:\/\//, '');
+    const tileJsonUrl = cleanHttpUrl
+      ? (cleanHttpUrl.endsWith('.json') ? cleanHttpUrl : cleanHttpUrl.replace(/\.pmtiles$/i, '.json'))
+      : '';
+
+    // 1. Prefer local self-hosted merged 8-country ASEAN PMTiles (`sea-full.json`) if available
+    if (tileJsonUrl) {
+      const seaFullJsonUrl = tileJsonUrl.replace(/[^/]+\.json$/i, 'sea-full.json');
+      if (seaFullJsonUrl !== tileJsonUrl || seaFullJsonUrl.includes('sea-full.json')) {
+        const seaMeta = await fetchJsonWithTimeout(seaFullJsonUrl, 1600);
+        if (seaMeta) {
+          console.info('[KartaMapBridge] Connected to self-hosted 8-country ASEAN PMTiles:', seaFullJsonUrl);
+          return buildDirectVectorSource(seaMeta, seaFullJsonUrl.replace(/\.json$/i, '/{z}/{x}/{y}.mvt'));
+        }
+      }
+    }
+
+    // 2. Live OpenFreeMap OpenMapTiles vector tiles covering ALL 8 ASEAN countries (MY/SG/BN/ID/TH/PH/VN/MM)
+    //    Ensures smartphones & Web render Malaysia + Indonesia + Thailand + Philippines + Vietnam + Myanmar out of the box.
+    const openFreeMapUrl = 'https://tiles.openfreemap.org/planet';
+    const ofmMeta = await fetchJsonWithTimeout(openFreeMapUrl, 5500);
+    if (ofmMeta) {
+      console.info('[KartaMapBridge] Connected to live OpenMapTiles (8-country SEA coverage):', openFreeMapUrl);
+      return buildDirectVectorSource(ofmMeta, openFreeMapUrl);
+    }
+
+    // 3. Offline / local fallback to configured MY/SG/BN PMTiles TileJSON
+    if (tileJsonUrl) {
+      const localMeta = await fetchJsonWithTimeout(tileJsonUrl, 2500);
+      if (localMeta) {
+        console.info('[KartaMapBridge] Connected to local PMTiles TileJSON:', tileJsonUrl);
+        return buildDirectVectorSource(localMeta, tileJsonUrl.replace(/\.json$/i, '/{z}/{x}/{y}.mvt'));
+      }
+    }
+
+    // 4. Direct pmtiles:// range protocol fallback
+    if (cleanHttpUrl && window.pmtiles) {
+      try {
+        const archive = new window.pmtiles.PMTiles(cleanHttpUrl);
+        const meta = await archive.getMetadata();
+        const layers = (meta && Array.isArray(meta.vector_layers))
           ? meta.vector_layers.map(l => l.id)
           : [];
         const schema = (layers.includes('buildings') || layers.includes('roads'))
           ? 'protomaps'
           : 'openmaptiles';
-        const tileTemplate = Array.isArray(meta.tiles) && meta.tiles.length > 0
-          ? meta.tiles[0]
-          : tileJsonUrl.replace(/\.json$/i, '/{z}/{x}/{y}.mvt');
-        const minzoom = typeof meta.minzoom === 'number' ? meta.minzoom : 0;
-        const maxzoom = typeof meta.maxzoom === 'number' ? meta.maxzoom : 14;
-        console.info('[KartaMapBridge] Connected to live PMTiles TileJSON:', tileJsonUrl, 'schema=' + schema, 'zoom=' + minzoom + '-' + maxzoom, 'layers=' + layers.length);
-        const directSource = {
-          type: 'vector',
-          tiles: Array.isArray(meta.tiles) && meta.tiles.length > 0 ? meta.tiles : [tileTemplate],
-          minzoom,
-          maxzoom,
-          scheme: meta.scheme || 'xyz',
-          attribution: meta.attribution || 'OpenStreetMap contributors | Karta Navigation'
-        };
-        if (Array.isArray(meta.bounds) && meta.bounds.length === 4) {
-          directSource.bounds = meta.bounds;
-        }
         return {
           schema,
-          tileTemplate,
-          pmtilesArchive: null,
-          sourceConfig: directSource
+          tileTemplate: null,
+          pmtilesArchive: archive,
+          sourceConfig: {
+            type: 'vector',
+            url: 'pmtiles://' + cleanHttpUrl,
+            attribution: 'OpenStreetMap contributors | Karta Navigation'
+          }
         };
+      } catch (e) {
+        console.warn('[KartaMapBridge] PMTiles archive probe warning:', e);
       }
-    } catch (e) {
-      console.warn('[KartaMapBridge] TileJSON probe failed, falling back to pmtiles:// protocol:', e);
     }
 
-    try {
-      const archive = new window.pmtiles.PMTiles(cleanHttpUrl);
-      const meta = await archive.getMetadata();
-      const layers = (meta && Array.isArray(meta.vector_layers))
-        ? meta.vector_layers.map(l => l.id)
-        : [];
-      const schema = (layers.includes('buildings') || layers.includes('roads'))
-        ? 'protomaps'
-        : 'openmaptiles';
-      return {
-        schema,
-        tileTemplate: null,
-        pmtilesArchive: archive,
-        sourceConfig: {
-          type: 'vector',
-          url: 'pmtiles://' + cleanHttpUrl,
-          attribution: 'OpenStreetMap contributors | Karta Navigation'
-        }
-      };
-    } catch (e) {
-      console.warn('[KartaMapBridge] PMTiles archive probe warning:', e);
-      return {
-        schema: 'openmaptiles',
-        tileTemplate: tileJsonUrl.replace(/\.json$/i, '/{z}/{x}/{y}.mvt'),
-        pmtilesArchive: null,
-        sourceConfig: {
-          type: 'vector',
-          url: tileJsonUrl
-        }
-      };
-    }
+    return {
+      schema: 'openmaptiles',
+      tileTemplate: null,
+      pmtilesArchive: null,
+      sourceConfig: {
+        type: 'vector',
+        url: openFreeMapUrl,
+        attribution: 'OpenStreetMap contributors | Karta Navigation'
+      }
+    };
+  }
+
+  /**
+   * Compact GeoJSON polygons for all 11 Southeast Asian nations evaluated natively
+   * inside MapLibre GL v5 Web Workers via `['within', geojson]` per road feature.
+   * This assigns every country's authentic official road shield at tile-parse time
+   * with ZERO pan/zoom delay, ZERO flickering, and simultaneous cross-border accuracy.
+   */
+  function makeGeoJsonPoly(ring) {
+    return { type: 'Polygon', coordinates: [ring] };
+  }
+  function makeGeoJsonMultiPoly(rings) {
+    return { type: 'MultiPolygon', coordinates: rings.map(r => [r]) };
+  }
+
+  const SEA_COUNTRY_GEOMS = {
+    SG: makeGeoJsonPoly([
+      [103.58, 1.13], [104.12, 1.13], [104.12, 1.475],
+      [103.80, 1.475], [103.63, 1.448], [103.58, 1.32], [103.58, 1.13]
+    ]),
+    TL: makeGeoJsonMultiPoly([
+      [[124.94, -9.58], [127.45, -9.58], [127.45, -8.08], [124.94, -8.08], [124.94, -9.58]],
+      [[124.02, -9.50], [124.50, -9.50], [124.50, -9.14], [124.02, -9.14], [124.02, -9.50]]
+    ]),
+    BN: makeGeoJsonMultiPoly([
+      [[114.06, 4.00], [115.06, 4.00], [115.06, 5.10], [114.06, 5.10], [114.06, 4.00]],
+      [[115.06, 4.28], [115.38, 4.28], [115.38, 4.96], [115.06, 4.96], [115.06, 4.28]]
+    ]),
+    PH: makeGeoJsonPoly([
+      [116.80, 7.60], [119.38, 7.32], [119.38, 4.50], [127.15, 4.50],
+      [127.15, 21.35], [119.40, 21.35], [116.80, 12.20], [116.80, 7.60]
+    ]),
+    MY: makeGeoJsonMultiPoly([
+      // Peninsular Malaysia (following exact Perlis/Kedah/Perak/Kelantan MY-TH border)
+      [
+        [99.45, 6.50], [100.20, 6.72], [100.42, 6.52], [100.85, 6.18],
+        [101.05, 5.70], [101.55, 5.75], [101.85, 5.85], [102.09, 6.24],
+        [104.60, 4.50], [104.60, 1.24], [103.48, 1.24], [101.95, 1.95],
+        [100.65, 3.05], [99.75, 5.20], [99.45, 6.50]
+      ],
+      // East Malaysia: Sarawak, Sabah & Labuan
+      [
+        [109.45, 2.15], [110.35, 0.88], [112.00, 1.05], [114.60, 1.55],
+        [115.55, 4.15], [117.95, 4.16], [119.38, 4.60], [119.38, 7.45],
+        [115.20, 7.45], [112.90, 4.70], [109.45, 2.15]
+      ]
+    ]),
+    TH: makeGeoJsonPoly([
+      [97.30, 19.60], [98.50, 19.85], [99.88, 20.49], [100.55, 20.25],
+      [101.35, 19.55], [101.05, 17.85], [102.60, 17.95], [104.10, 18.42],
+      [104.80, 17.40], [105.65, 15.30], [105.20, 14.35], [102.70, 14.25],
+      [102.35, 13.40], [102.91, 11.65], [101.80, 10.50], [101.60, 7.60],
+      [102.09, 6.24], [101.85, 5.85], [101.55, 5.75], [101.05, 5.70],
+      [100.85, 6.18], [100.42, 6.52], [100.20, 6.72], [99.45, 6.50],
+      [98.05, 7.75], [98.55, 10.00], [99.20, 13.00], [98.35, 15.20],
+      [97.80, 17.50], [97.30, 19.60]
+    ]),
+    KH: makeGeoJsonPoly([
+      [102.35, 13.40], [102.70, 14.25], [105.20, 14.35], [106.05, 14.00],
+      [107.62, 14.68], [107.62, 12.40], [106.55, 11.95], [106.05, 11.15],
+      [105.08, 10.95], [104.42, 10.42], [102.91, 11.65], [102.35, 13.40]
+    ]),
+    LA: makeGeoJsonPoly([
+      [100.08, 20.42], [101.20, 22.55], [102.35, 22.42], [103.85, 20.95],
+      [104.80, 20.10], [104.10, 19.05], [105.20, 18.25], [106.25, 17.10],
+      [107.62, 14.68], [106.05, 14.00], [105.20, 14.35], [105.65, 15.30],
+      [104.80, 17.40], [104.10, 18.42], [102.60, 17.95], [101.05, 17.85],
+      [101.35, 19.55], [100.55, 20.25], [100.08, 20.42]
+    ]),
+    VN: makeGeoJsonPoly([
+      [102.12, 22.45], [105.40, 23.48], [108.18, 21.58], [109.62, 13.00],
+      [106.85, 8.45], [104.35, 8.45], [103.75, 10.35], [104.42, 10.42],
+      [105.08, 10.95], [106.05, 11.15], [106.55, 11.95], [107.62, 12.40],
+      [107.62, 14.68], [106.25, 17.10], [105.20, 18.25], [104.10, 19.05],
+      [104.80, 20.10], [103.85, 20.95], [102.35, 22.42], [102.12, 22.45]
+    ]),
+    MM: makeGeoJsonPoly([
+      [92.05, 20.70], [92.85, 24.55], [96.00, 27.65], [97.50, 28.65],
+      [98.85, 28.25], [98.95, 25.00], [99.85, 23.95], [101.20, 21.52],
+      [100.08, 20.42], [99.88, 20.49], [98.50, 19.85], [97.30, 19.60],
+      [97.80, 17.50], [98.35, 15.20], [99.20, 13.00], [98.55, 10.00],
+      [97.45, 9.55], [93.90, 15.50], [92.05, 20.70]
+    ]),
+    ID: makeGeoJsonPoly([
+      [94.40, 6.00], [99.75, 5.20], [100.65, 3.05], [101.95, 1.95],
+      [103.48, 1.24], [104.60, 1.24], [109.45, 2.15], [110.35, 0.88],
+      [112.00, 1.05], [114.60, 1.55], [115.55, 4.15], [117.95, 4.16],
+      [119.38, 4.60], [127.15, 4.50], [134.50, 1.60], [141.06, -2.40],
+      [141.06, -9.30], [136.00, -10.65], [122.80, -11.40], [114.00, -9.90],
+      [104.50, -7.95], [97.00, -3.65], [94.40, 6.00]
+    ])
+  };
+
+  /**
+   * Builds a single static, GPU/worker-evaluated MapLibre expression that assigns
+   * every road segment in Southeast Asia its exact own country's official road shield
+   * immediately on tile parse — zero camera-move delay, zero flicker, works right on borders!
+   */
+  function buildInstantPerCountryShieldExpressions(isExpresswayLayer) {
+    const cleanRefExpr = [
+      'let', 'raw', ['upcase', ['to-string', ['coalesce', ['get', 'ref'], '']]],
+      [
+        'let', 'sep', ['index-of', ';', ['var', 'raw']],
+        ['case', ['>', ['var', 'sep'], 0], ['slice', ['var', 'raw'], 0, ['var', 'sep']], ['var', 'raw']]
+      ]
+    ];
+    const sgExpresswayRefs = ['CTE', 'PIE', 'AYE', 'ECP', 'SLE', 'BKE', 'KJE', 'TPE', 'KPE', 'MCE', 'NSC'];
+    const phExpresswayRefs = ['NLEX', 'SLEX', 'SCTEX', 'TPLEX', 'CALAX', 'CAVITEX', 'MCX', 'STAR', 'SKYWAY', 'NAIAX', 'CCLEX'];
+    const numericFirstChars = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
+    const sizeSuffixExpr = [
+      'case',
+      ['<=', ['length', cleanRefExpr], 2], 'sm',
+      ['==', ['length', cleanRefExpr], 3], 'md',
+      ['==', ['length', cleanRefExpr], 4], 'lg',
+      'xl'
+    ];
+
+    const isSgExp = ['in', cleanRefExpr, ['literal', sgExpresswayRefs]];
+    const isPhNamedExp = ['in', cleanRefExpr, ['literal', phExpresswayRefs]];
+    const isAsean = ['==', ['slice', cleanRefExpr, 0, 2], 'AH'];
+    const isVnExpPrefix = [
+      'any',
+      ['==', ['slice', cleanRefExpr, 0, 2], 'CT'],
+      ['==', ['slice', cleanRefExpr, 0, 3], 'ĐCT']
+    ];
+    const isVnNatPrefix = [
+      'any',
+      ['==', ['slice', cleanRefExpr, 0, 2], 'QL'],
+      ['==', ['slice', cleanRefExpr, 0, 2], 'ĐT'],
+      ['==', ['slice', cleanRefExpr, 0, 2], 'TL']
+    ];
+    const isNumeric = ['in', ['slice', cleanRefExpr, 0, 1], ['literal', numericFirstChars]];
+    const startsE = ['==', ['slice', cleanRefExpr, 0, 1], 'E'];
+    const startsM = ['==', ['slice', cleanRefExpr, 0, 1], 'M'];
+    const startsB = ['==', ['slice', cleanRefExpr, 0, 1], 'B'];
+    const startsFT = ['==', ['slice', cleanRefExpr, 0, 2], 'FT'];
+    const startsTol = ['==', ['slice', cleanRefExpr, 0, 3], 'TOL'];
+
+    const inSG = ['within', SEA_COUNTRY_GEOMS.SG];
+    const inTL = ['within', SEA_COUNTRY_GEOMS.TL];
+    const inBN = ['within', SEA_COUNTRY_GEOMS.BN];
+    const inPH = ['within', SEA_COUNTRY_GEOMS.PH];
+    const inMY = ['within', SEA_COUNTRY_GEOMS.MY];
+    const inTH = ['within', SEA_COUNTRY_GEOMS.TH];
+    const inKH = ['within', SEA_COUNTRY_GEOMS.KH];
+    const inLA = ['within', SEA_COUNTRY_GEOMS.LA];
+    const inVN = ['within', SEA_COUNTRY_GEOMS.VN];
+    const inMM = ['within', SEA_COUNTRY_GEOMS.MM];
+    const inID = ['within', SEA_COUNTRY_GEOMS.ID];
+
+    const prefixExpr = [
+      'case',
+      // 1. Unambiguous trans-national / unique prefix shields (O(1) string match)
+      isAsean, 'karta-shield-asean-',
+      isSgExp, 'karta-shield-sg-exp-',
+      isVnExpPrefix, 'karta-shield-vn-exp-',
+      isVnNatPrefix, 'karta-shield-vn-nat-',
+      isPhNamedExp, 'karta-shield-ph-exp-',
+
+      // 2. Native per-feature geographic country resolution (worker-side, zero delay)
+      inSG, 'karta-shield-sg-exp-',
+      inTL, ['case', startsB, 'karta-shield-tl-sec-', 'karta-shield-tl-nat-'],
+      inBN, isExpresswayLayer ? 'karta-shield-my-exp-' : 'karta-shield-my-fed-',
+      inPH, (isExpresswayLayer
+        ? 'karta-shield-ph-exp-'
+        : ['case', startsE, 'karta-shield-ph-exp-', 'karta-shield-ph-nat-']),
+      inTH, (isExpresswayLayer
+        ? 'karta-shield-th-mwy-'
+        : ['case', startsM, 'karta-shield-th-mwy-', 'karta-shield-th-hwy-']),
+      inKH, (isExpresswayLayer
+        ? 'karta-shield-kh-exp-'
+        : ['case', startsE, 'karta-shield-kh-exp-', 'karta-shield-kh-nat-']),
+      inLA, (isExpresswayLayer
+        ? 'karta-shield-la-exp-'
+        : ['case', startsE, 'karta-shield-la-exp-', 'karta-shield-la-nat-']),
+      inVN, (isExpresswayLayer ? 'karta-shield-vn-exp-' : 'karta-shield-vn-nat-'),
+      inMM, 'karta-shield-mm-hwy-',
+      inMY, [
+        'case',
+        startsE, 'karta-shield-my-exp-',
+        ['any', isNumeric, startsFT], 'karta-shield-my-fed-',
+        'karta-shield-my-state-'
+      ],
+      inID, (isExpresswayLayer
+        ? 'karta-shield-id-tol-'
+        : ['case', startsTol, 'karta-shield-id-tol-', 'karta-shield-id-nat-']),
+
+      // 3. Rare border-crossing segment fallback (Malaysia JKR hexagon)
+      startsE, 'karta-shield-my-exp-',
+      ['any', isNumeric, startsFT], 'karta-shield-my-fed-',
+      'karta-shield-my-state-'
+    ];
+
+    const textColorExpr = [
+      'case',
+      isAsean, '#FFFFFF',
+      isSgExp, '#FFFFFF',
+      isVnExpPrefix, '#11161C',
+      isVnNatPrefix, '#11161C',
+      isPhNamedExp, '#11161C',
+      inSG, '#FFFFFF',
+      inTL, '#FFFFFF',
+      inMM, '#FFFFFF',
+      inTH, (isExpresswayLayer ? '#FFFFFF' : ['case', startsM, '#FFFFFF', '#11161C']),
+      inKH, (isExpresswayLayer ? '#FFFFFF' : ['case', startsE, '#FFFFFF', '#032EA1']),
+      inLA, (isExpresswayLayer ? '#FFFFFF' : ['case', startsE, '#FFFFFF', '#11161C']),
+      inID, (isExpresswayLayer ? '#FFFFFF' : ['case', startsTol, '#FFFFFF', '#11161C']),
+      '#11161C'
+    ];
+
+    const textOffsetExpr = [
+      'case',
+      inTH, (isExpresswayLayer ? ['literal', [0, 0.14]] : ['literal', [0, 0.24]]),
+      inID, (isExpresswayLayer ? ['literal', [0, 0.04]] : ['literal', [0, 0.14]]),
+      inPH, (isExpresswayLayer ? ['literal', [0, 0.04]] : ['literal', [0, 0.12]]),
+      inLA, (isExpresswayLayer ? ['literal', [0, 0.04]] : ['literal', [0, 0.14]]),
+      inKH, (isExpresswayLayer ? ['literal', [0, 0.04]] : ['literal', [0, 0.08]]),
+      ['literal', [0, 0.04]]
+    ];
+
+    return {
+      cleanRefExpr,
+      iconImageExpr: ['concat', prefixExpr, sizeSuffixExpr],
+      textColorExpr,
+      textOffsetExpr
+    };
   }
 
   /**
@@ -278,6 +612,89 @@
         id: 'roads_motorway', type: 'line', source: 'karta_basemap', 'source-layer': roadLayer, filter: hwyFilter,
         layout: { 'line-cap': 'round', 'line-join': 'round' },
         paint: { 'line-color': isDay ? '#2F756F' : '#5B9A94', 'line-opacity': isDay ? 0.94 : 0.86, 'line-width': ['interpolate', ['exponential', 1.5], ['zoom'], 5, 1.4, 12, isDay ? 5.0 : 4.2, 17, isDay ? 15.6 : 14.0] }
+      },
+      // Heavy Railway Corridors (KTMB / ETS / SRT / KAI / PNR / VNR / LCR)
+      {
+        id: 'rail_heavy_casing',
+        type: 'line',
+        source: 'karta_basemap',
+        'source-layer': roadLayer,
+        minzoom: 6.5,
+        filter: isProtomaps
+          ? ['==', ['get', 'kind'], 'rail']
+          : ['all', ['==', ['get', 'class'], 'rail'], ['!', ['in', ['get', 'subclass'], ['literal', ['subway', 'light_rail', 'monorail', 'tram', 'funicular']]]]],
+        layout: { 'line-cap': 'butt', 'line-join': 'round' },
+        paint: {
+          'line-color': isDay ? '#525E6B' : '#0B0F14',
+          'line-width': ['interpolate', ['linear'], ['zoom'], 6.5, 1.8, 12, 3.8, 16, 6.2],
+          'line-opacity': isDay ? 0.85 : 0.90
+        }
+      },
+      {
+        id: 'rail_heavy_line',
+        type: 'line',
+        source: 'karta_basemap',
+        'source-layer': roadLayer,
+        minzoom: 6.5,
+        filter: isProtomaps
+          ? ['==', ['get', 'kind'], 'rail']
+          : ['all', ['==', ['get', 'class'], 'rail'], ['!', ['in', ['get', 'subclass'], ['literal', ['subway', 'light_rail', 'monorail', 'tram', 'funicular']]]]],
+        layout: { 'line-cap': 'butt', 'line-join': 'round' },
+        paint: {
+          'line-color': isDay ? '#7A8796' : '#8FA3B8',
+          'line-width': ['interpolate', ['linear'], ['zoom'], 6.5, 1.0, 12, 2.2, 16, 3.6],
+          'line-opacity': 0.95
+        }
+      },
+      {
+        id: 'rail_heavy_ties',
+        type: 'line',
+        source: 'karta_basemap',
+        'source-layer': roadLayer,
+        minzoom: 9.0,
+        filter: isProtomaps
+          ? ['==', ['get', 'kind'], 'rail']
+          : ['all', ['==', ['get', 'class'], 'rail'], ['!', ['in', ['get', 'subclass'], ['literal', ['subway', 'light_rail', 'monorail', 'tram', 'funicular']]]]],
+        layout: { 'line-cap': 'butt', 'line-join': 'round' },
+        paint: {
+          'line-color': isDay ? '#FFFFFF' : '#18202B',
+          'line-width': ['interpolate', ['linear'], ['zoom'], 9, 1.4, 13, 2.2, 16, 3.2],
+          'line-dasharray': [2.2, 2.2],
+          'line-opacity': 0.92
+        }
+      },
+      // Urban Rapid Transit (MRT / LRT / KLIA Ekspres / BTS / Monorail / Tram / Whoosh)
+      {
+        id: 'rail_transit_casing',
+        type: 'line',
+        source: 'karta_basemap',
+        'source-layer': roadLayer,
+        minzoom: 9.0,
+        filter: isProtomaps
+          ? ['in', ['get', 'kind_detail'], ['literal', ['subway', 'light_rail', 'monorail', 'tram']]]
+          : ['any', ['==', ['get', 'class'], 'transit'], ['all', ['==', ['get', 'class'], 'rail'], ['in', ['get', 'subclass'], ['literal', ['subway', 'light_rail', 'monorail', 'tram', 'funicular']]]]],
+        layout: { 'line-cap': 'round', 'line-join': 'round' },
+        paint: {
+          'line-color': isDay ? '#0C4A6E' : '#061A29',
+          'line-width': ['interpolate', ['linear'], ['zoom'], 9, 2.8, 13, 5.2, 16, 8.0],
+          'line-opacity': 0.88
+        }
+      },
+      {
+        id: 'rail_transit_line',
+        type: 'line',
+        source: 'karta_basemap',
+        'source-layer': roadLayer,
+        minzoom: 9.0,
+        filter: isProtomaps
+          ? ['in', ['get', 'kind_detail'], ['literal', ['subway', 'light_rail', 'monorail', 'tram']]]
+          : ['any', ['==', ['get', 'class'], 'transit'], ['all', ['==', ['get', 'class'], 'rail'], ['in', ['get', 'subclass'], ['literal', ['subway', 'light_rail', 'monorail', 'tram', 'funicular']]]]],
+        layout: { 'line-cap': 'round', 'line-join': 'round' },
+        paint: {
+          'line-color': isDay ? '#0284C7' : '#38BDF8',
+          'line-width': ['interpolate', ['linear'], ['zoom'], 9, 1.6, 13, 3.2, 16, 5.0],
+          'line-opacity': 0.96
+        }
       },
       {
         id: 'buildings_footprint', type: 'fill', source: 'karta_basemap', 'source-layer': bldgLayer, minzoom: 12.0,
@@ -452,43 +869,8 @@
       'karta-poi-pin'
     ];
 
-    const cleanRefExpr = [
-      'let', 'raw', ['upcase', ['to-string', ['coalesce', ['get', 'ref'], '']]],
-      [
-        'let', 'sep', ['index-of', ';', ['var', 'raw']],
-        ['case', ['>', ['var', 'sep'], 0], ['slice', ['var', 'raw'], 0, ['var', 'sep']], ['var', 'raw']]
-      ]
-    ];
-    const sgExpresswayRefs = ['CTE', 'PIE', 'AYE', 'ECP', 'SLE', 'BKE', 'KJE', 'TPE', 'KPE', 'MCE', 'NSC'];
-    const myNumericFirstChars = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
-    const shieldSizeSuffixExpr = [
-      'case',
-      ['<=', ['length', cleanRefExpr], 2], 'sm',
-      ['==', ['length', cleanRefExpr], 3], 'md',
-      ['==', ['length', cleanRefExpr], 4], 'lg',
-      'xl'
-    ];
-    const shieldPrefixExpr = [
-      'case',
-      ['in', cleanRefExpr, ['literal', sgExpresswayRefs]], 'karta-shield-sg-exp-',
-      ['==', ['slice', cleanRefExpr, 0, 2], 'AH'], 'karta-shield-asean-',
-      ['==', ['slice', cleanRefExpr, 0, 1], 'E'], 'karta-shield-my-exp-',
-      [
-        'any',
-        ['in', ['slice', cleanRefExpr, 0, 1], ['literal', myNumericFirstChars]],
-        ['==', ['slice', cleanRefExpr, 0, 2], 'FT']
-      ], 'karta-shield-my-fed-',
-      'karta-shield-my-state-'
-    ];
-    const shieldTextColorExpr = [
-      'case',
-      [
-        'any',
-        ['in', cleanRefExpr, ['literal', sgExpresswayRefs]],
-        ['==', ['slice', cleanRefExpr, 0, 2], 'AH']
-      ], '#FFFFFF',
-      '#11161C'
-    ];
+    const expShieldSpec = buildInstantPerCountryShieldExpressions(true);
+    const fedShieldSpec = buildInstantPerCountryShieldExpressions(false);
 
     baseLayers.push(
       {
@@ -543,19 +925,19 @@
         layout: {
           'symbol-placement': 'line',
           'symbol-spacing': 280,
-          'icon-image': ['concat', shieldPrefixExpr, shieldSizeSuffixExpr],
+          'icon-image': expShieldSpec.iconImageExpr,
           'icon-size': ['interpolate', ['linear'], ['zoom'], 6.5, 0.86, 12, 0.96, 15, 1.04],
           'icon-rotation-alignment': 'viewport',
           'icon-pitch-alignment': 'viewport',
-          'text-field': cleanRefExpr,
+          'text-field': expShieldSpec.cleanRefExpr,
           'text-font': ['Open Sans Semibold'],
           'text-size': ['interpolate', ['linear'], ['zoom'], 6.5, 9.4, 12, 10.4, 15, 11.2],
-          'text-offset': [0, 0.04],
+          'text-offset': expShieldSpec.textOffsetExpr,
           'text-rotation-alignment': 'viewport',
           'text-pitch-alignment': 'viewport'
         },
         paint: {
-          'text-color': shieldTextColorExpr
+          'text-color': expShieldSpec.textColorExpr
         }
       },
       {
@@ -568,19 +950,70 @@
         layout: {
           'symbol-placement': 'line',
           'symbol-spacing': 340,
-          'icon-image': ['concat', shieldPrefixExpr, shieldSizeSuffixExpr],
+          'icon-image': fedShieldSpec.iconImageExpr,
           'icon-size': ['interpolate', ['linear'], ['zoom'], 8.5, 0.84, 13, 0.94, 16, 1.0],
           'icon-rotation-alignment': 'viewport',
           'icon-pitch-alignment': 'viewport',
-          'text-field': cleanRefExpr,
+          'text-field': fedShieldSpec.cleanRefExpr,
           'text-font': ['Open Sans Semibold'],
           'text-size': ['interpolate', ['linear'], ['zoom'], 8.5, 9.0, 13, 10.0, 16, 10.6],
-          'text-offset': [0, 0.04],
+          'text-offset': fedShieldSpec.textOffsetExpr,
           'text-rotation-alignment': 'viewport',
           'text-pitch-alignment': 'viewport'
         },
         paint: {
-          'text-color': shieldTextColorExpr
+          'text-color': fedShieldSpec.textColorExpr
+        }
+      },
+      {
+        id: 'rail_label',
+        type: 'symbol',
+        source: 'karta_basemap',
+        'source-layer': roadLabelLayer,
+        minzoom: 11.2,
+        filter: isProtomaps
+          ? ['==', ['get', 'kind'], 'rail']
+          : ['in', ['get', 'class'], ['literal', ['rail', 'transit']]],
+        layout: {
+          'symbol-placement': 'line',
+          'symbol-spacing': 320,
+          'text-field': ['coalesce', ['get', 'name:en'], ['get', 'name']],
+          'text-font': ['Open Sans Semibold'],
+          'text-size': ['interpolate', ['linear'], ['zoom'], 11.2, 9.8, 15, 12.0]
+        },
+        paint: {
+          'text-color': isDay ? '#0369A1' : '#7DD3FC',
+          'text-halo-color': isDay ? '#FCFBF8' : '#0D0F12',
+          'text-halo-width': 1.9
+        }
+      },
+      {
+        id: 'poi_rail_station',
+        type: 'symbol',
+        source: 'karta_basemap',
+        'source-layer': isProtomaps ? 'pois' : 'poi',
+        minzoom: 10.2,
+        filter: isProtomaps
+          ? ['in', ['get', 'kind'], ['literal', ['station', 'subway_entrance', 'tram_stop', 'rail_station']]]
+          : ['any', ['==', ['get', 'class'], 'railway'], ['in', ['get', 'subclass'], ['literal', ['station', 'halt', 'subway_entrance', 'tram_stop', 'light_rail', 'subway', 'monorail']]]],
+        layout: {
+          'icon-image': 'karta-poi-rail-station',
+          'icon-size': ['interpolate', ['linear'], ['zoom'], 10.2, 0.62, 13.5, 0.80, 16.5, 0.96],
+          'icon-anchor': 'bottom',
+          'text-field': ['coalesce', ['get', 'name:en'], ['get', 'name']],
+          'text-font': ['Open Sans Semibold'],
+          'text-size': ['interpolate', ['linear'], ['zoom'], 10.2, 10.0, 14.5, 12.2],
+          'text-offset': [0, 0.25],
+          'text-anchor': 'top',
+          'text-max-width': 9,
+          'text-optional': true
+        },
+        paint: {
+          'text-color': isDay ? '#0C4A6E' : '#BAE6FD',
+          'text-halo-color': isDay ? '#FCFBF8' : '#0D0F12',
+          'text-halo-width': 2.0,
+          'icon-opacity': 0.98,
+          'text-opacity': 0.97
         }
       },
       {
@@ -589,6 +1022,9 @@
         source: 'karta_basemap',
         'source-layer': isProtomaps ? 'pois' : 'poi',
         minzoom: 12.2,
+        filter: isProtomaps
+          ? ['!', ['in', ['get', 'kind'], ['literal', ['station', 'subway_entrance', 'tram_stop', 'rail_station']]]]
+          : ['all', ['!=', ['get', 'class'], 'railway'], ['!', ['in', ['get', 'subclass'], ['literal', ['station', 'halt', 'subway_entrance', 'tram_stop']]]]],
         layout: {
           'icon-image': poiIconMatch,
           'icon-size': ['interpolate', ['linear'], ['zoom'], 12.2, 0.58, 15.5, 0.78, 18, 0.92],
@@ -654,9 +1090,31 @@
       }
     );
 
+    baseLayers.push(
+      {
+        id: 'karta_sea_region_mask',
+        type: 'fill',
+        source: 'karta_sea_mask',
+        paint: {
+          'fill-color': isDay ? '#EAE6DB' : '#080A0D',
+          'fill-opacity': 0.94
+        }
+      },
+      {
+        id: 'karta_sea_region_outline',
+        type: 'line',
+        source: 'karta_sea_mask',
+        paint: {
+          'line-color': isDay ? '#2F756F' : '#5B9A94',
+          'line-width': 1.4,
+          'line-opacity': 0.42
+        }
+      }
+    );
+
     return {
       version: 8,
-      name: isDay ? 'Karta Tropical Daylight 3D Automotive v1' : 'Karta Dark 3D Automotive v1',
+      name: isDay ? 'Karta Southeast Asia Daylight 3D v1' : 'Karta Southeast Asia Dark 3D v1',
       light: {
         anchor: 'viewport',
         color: isDay ? '#FFFDF5' : '#E8F4F2',
@@ -664,7 +1122,11 @@
         position: isDay ? [1.25, 195, 52] : [1.4, 215, 38]
       },
       sources: {
-        karta_basemap: sourceConfig
+        karta_basemap: sourceConfig,
+        karta_sea_mask: {
+          type: 'geojson',
+          data: SEA_OUTER_MASK_GEOJSON
+        }
       },
       glyphs: 'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf',
       layers: baseLayers
@@ -907,8 +1369,359 @@
     for (const sz of rectSizes) {
       // Singapore LTA Expressway (CTE, PIE, AYE, ECP, SLE, etc.): Emerald green rounded shield + white inner border
       addRoundedRectShield('karta-shield-sg-exp-' + sz.key, sz.w, sz.h, '#006B44', '#FFFFFF', '#083B27');
-      // ASEAN Highway (AH2, AH18, AH150): Royal blue shield + white inner border
+      // ASEAN Highway (AH1, AH2, AH18, AH25, AH26, AH150): Royal blue shield + white inner border
       addRoundedRectShield('karta-shield-asean-' + sz.key, sz.w, sz.h, '#003DA5', '#FFFFFF', '#06204F');
+      // Philippines DPWH Expressway (E1..E6, NLEX, SLEX, CALAX): Bright yellow rectangle + black inner border
+      addRoundedRectShield('karta-shield-ph-exp-' + sz.key, sz.w + 2, sz.h, '#FFD100', '#11161C', '#1F2933');
+      // Vietnam QCVN 41 Expressway (CT.01..CT.55): Fluorescent yellow rectangle + black inner border
+      addRoundedRectShield('karta-shield-vn-exp-' + sz.key, sz.w + 4, sz.h, '#F5E600', '#11161C', '#222831');
+      // Vietnam QCVN 41 National / Provincial Highway (QL.1A, 1A, ĐT*): Crisp white rectangle + black inner border
+      addRoundedRectShield('karta-shield-vn-nat-' + sz.key, sz.w + 2, sz.h, '#FFFFFF', '#11161C', '#2A333E');
+      // Myanmar Department of Highways / RTAD (E1, NH1..NH48, 1..48): Emerald green shield + white inner border
+      addRoundedRectShield('karta-shield-mm-hwy-' + sz.key, sz.w + 2, sz.h, '#006B3F', '#FFFFFF', '#063B24');
+      // Laos Expressway (Vientiane-Vang Vieng): Emerald green rectangle + crisp white inner border
+      addRoundedRectShield('karta-shield-la-exp-' + sz.key, sz.w + 2, sz.h, '#007A3D', '#FFFFFF', '#073D20');
+      // Cambodia Expressway (E1, E4 Phnom Penh-Sihanoukville): Deep emerald green + yellow/white expressway border
+      addRoundedRectShield('karta-shield-kh-exp-' + sz.key, sz.w + 2, sz.h, '#006B3F', '#FFD100', '#FFFFFF');
+      // Timor-Leste National Roads (A01..A19, N1): Emerald green MOP shield + crisp white inner border
+      addRoundedRectShield('karta-shield-tl-nat-' + sz.key, sz.w + 2, sz.h, '#006B44', '#FFFFFF', '#083B27');
+      // Timor-Leste Secondary Municipal Roads (B*): Royal blue shield + white inner border
+      addRoundedRectShield('karta-shield-tl-sec-' + sz.key, sz.w + 2, sz.h, '#004B8D', '#FFFFFF', '#072546');
+    }
+
+    // Laos National Highway Shield (Route 13, 1..18): White plate with official Crimson Red top header bar
+    function addLaosNationalShield(id, w, h) {
+      if (map.hasImage(id)) map.removeImage(id);
+      const canvas = document.createElement('canvas');
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+      ctx.clearRect(0, 0, w, h);
+
+      const x = 4, y = 4, rw = w - 8, rh = h - 8, r = 7;
+      function traceBox() {
+        ctx.beginPath();
+        ctx.moveTo(x + r, y);
+        ctx.lineTo(x + rw - r, y);
+        ctx.quadraticCurveTo(x + rw, y, x + rw, y + r);
+        ctx.lineTo(x + rw, y + rh - r);
+        ctx.quadraticCurveTo(x + rw, y + rh, x + rw - r, y + rh);
+        ctx.lineTo(x + r, y + rh);
+        ctx.quadraticCurveTo(x, y + rh, x, y + rh - r);
+        ctx.lineTo(x, y + r);
+        ctx.quadraticCurveTo(x, y, x + r, y);
+        ctx.closePath();
+      }
+      ctx.save();
+      ctx.shadowColor = isDay ? 'rgba(17, 22, 28, 0.32)' : 'rgba(0, 0, 0, 0.68)';
+      ctx.shadowBlur = 4;
+      ctx.shadowOffsetY = 1.5;
+      traceBox();
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fill();
+      ctx.restore();
+
+      ctx.save();
+      traceBox();
+      ctx.clip();
+      ctx.fillStyle = '#CE1126';
+      ctx.fillRect(x, y, rw, 10.5);
+      ctx.restore();
+
+      traceBox();
+      ctx.lineWidth = 2.4;
+      ctx.strokeStyle = '#CE1126';
+      ctx.stroke();
+
+      map.addImage(id, ctx.getImageData(0, 0, w, h), { pixelRatio: 2 });
+    }
+
+    // Cambodia National Highway Shield (N1-KH.svg): Pointed-bottom white heraldic shield with Royal Blue border
+    function addCambodiaNationalShield(id, w, h) {
+      if (map.hasImage(id)) map.removeImage(id);
+      const canvas = document.createElement('canvas');
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+      ctx.clearRect(0, 0, w, h);
+
+      const cx = w / 2, left = 5, right = w - 5, top = 4.5, bottom = h - 4.5;
+      const shoulderY = bottom - Math.round((bottom - top) * 0.28);
+      const outerPts = [
+        [left, top],
+        [right, top],
+        [right, shoulderY],
+        [cx, bottom],
+        [left, shoulderY]
+      ];
+      const innerPts = [
+        [left + 3.6, top + 3.6],
+        [right - 3.6, top + 3.6],
+        [right - 3.6, shoulderY - 1.8],
+        [cx, bottom - 4.0],
+        [left + 3.6, shoulderY - 1.8]
+      ];
+
+      ctx.save();
+      ctx.shadowColor = isDay ? 'rgba(17, 22, 28, 0.34)' : 'rgba(0, 0, 0, 0.70)';
+      ctx.shadowBlur = 4.2;
+      ctx.shadowOffsetY = 1.5;
+      traceRoundedPolygon(ctx, outerPts, 4.0);
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fill();
+      ctx.restore();
+
+      ctx.save();
+      traceRoundedPolygon(ctx, outerPts, 4.0);
+      ctx.clip();
+      ctx.fillStyle = '#032EA1';
+      ctx.fillRect(0, 0, w, top + 7.5);
+      ctx.restore();
+
+      traceRoundedPolygon(ctx, outerPts, 4.0);
+      ctx.lineWidth = 2.0;
+      ctx.strokeStyle = '#032EA1';
+      ctx.stroke();
+
+      traceRoundedPolygon(ctx, innerPts, 2.5);
+      ctx.lineWidth = 1.6;
+      ctx.strokeStyle = '#032EA1';
+      ctx.stroke();
+
+      map.addImage(id, ctx.getImageData(0, 0, w, h), { pixelRatio: 2 });
+    }
+
+    // Indonesia (PM 13/2014): Jalan Nasional Red-and-White Hexagon + Jalan Tol Emerald/Gold Hexagon
+    function addIndonesiaNationalShield(id, w, h) {
+      if (map.hasImage(id)) map.removeImage(id);
+      const canvas = document.createElement('canvas');
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+      ctx.clearRect(0, 0, w, h);
+
+      const cx = w / 2, cy = h / 2;
+      const halfW = cx - 4.5, halfH = cy - 4.0;
+      const roofDrop = Math.round(halfH * 0.42);
+      const outerPts = jkrHexVertices(cx, cy, halfW, halfH, roofDrop);
+
+      ctx.save();
+      ctx.shadowColor = isDay ? 'rgba(17, 22, 28, 0.34)' : 'rgba(0, 0, 0, 0.70)';
+      ctx.shadowBlur = 4.5;
+      ctx.shadowOffsetY = 1.5;
+      traceRoundedPolygon(ctx, outerPts, 3.4);
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fill();
+      ctx.restore();
+
+      // Official Indonesian Red-and-White top crest banner clipped cleanly to hexagon
+      ctx.save();
+      traceRoundedPolygon(ctx, outerPts, 3.4);
+      ctx.clip();
+      ctx.fillStyle = '#D61F26';
+      ctx.fillRect(0, 0, w, cy - halfH + roofDrop + 3);
+      ctx.restore();
+
+      // Outer crimson red border + crisp dark inner outline
+      traceRoundedPolygon(ctx, outerPts, 3.4);
+      ctx.lineWidth = 2.6;
+      ctx.strokeStyle = '#D61F26';
+      ctx.stroke();
+
+      const innerPts = jkrHexVertices(cx, cy, halfW - 3.6, halfH - 3.6, Math.round((halfH - 3.6) * 0.42));
+      traceRoundedPolygon(ctx, innerPts, 2.0);
+      ctx.lineWidth = 1.6;
+      ctx.strokeStyle = '#11161C';
+      ctx.stroke();
+
+      map.addImage(id, ctx.getImageData(0, 0, w, h), { pixelRatio: 2 });
+    }
+
+    // Thailand DOH National Highway Shield (White shield with iconic Garuda crest peak)
+    function addThailandHighwayShield(id, w, h) {
+      if (map.hasImage(id)) map.removeImage(id);
+      const canvas = document.createElement('canvas');
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+      ctx.clearRect(0, 0, w, h);
+
+      const cx = w / 2;
+      const left = 5, right = w - 5;
+      const bodyTop = 18, bottom = h - 5;
+
+      // Iconic curved Garuda-crown white shield silhouette
+      ctx.save();
+      ctx.shadowColor = isDay ? 'rgba(17, 22, 28, 0.32)' : 'rgba(0, 0, 0, 0.68)';
+      ctx.shadowBlur = 4.2;
+      ctx.shadowOffsetY = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(cx, 3.5);
+      ctx.quadraticCurveTo(cx + 12, 4.5, cx + 16, bodyTop - 3);
+      ctx.lineTo(right - 4, bodyTop - 3);
+      ctx.quadraticCurveTo(right, bodyTop - 3, right, bodyTop + 2);
+      ctx.lineTo(right, bottom - 6);
+      ctx.quadraticCurveTo(right, bottom, right - 6, bottom);
+      ctx.lineTo(left + 6, bottom);
+      ctx.quadraticCurveTo(left, bottom, left, bottom - 6);
+      ctx.lineTo(left, bodyTop + 2);
+      ctx.quadraticCurveTo(left, bodyTop - 3, left + 4, bodyTop - 3);
+      ctx.lineTo(cx - 16, bodyTop - 3);
+      ctx.quadraticCurveTo(cx - 12, 4.5, cx, 3.5);
+      ctx.closePath();
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fill();
+      ctx.restore();
+
+      // Bold black DOH shield border
+      ctx.lineWidth = 2.6;
+      ctx.strokeStyle = '#11161C';
+      ctx.stroke();
+
+      // Stylized Garuda emblem wings + crest atop shield (signature Thai highway motif)
+      ctx.fillStyle = '#B91C1C';
+      ctx.beginPath();
+      ctx.moveTo(cx, 6.2);
+      ctx.lineTo(cx + 3.2, 10.5);
+      ctx.lineTo(cx + 10.5, 9.8);
+      ctx.lineTo(cx + 5.8, 13.8);
+      ctx.lineTo(cx, 15.8);
+      ctx.lineTo(cx - 5.8, 13.8);
+      ctx.lineTo(cx - 10.5, 9.8);
+      ctx.lineTo(cx - 3.2, 10.5);
+      ctx.closePath();
+      ctx.fill();
+
+      // Gold center dot on Garuda emblem
+      ctx.fillStyle = '#F5B700';
+      ctx.beginPath();
+      ctx.arc(cx, 11.2, 2.0, 0, Math.PI * 2);
+      ctx.fill();
+
+      map.addImage(id, ctx.getImageData(0, 0, w, h), { pixelRatio: 2 });
+    }
+
+    // Thailand Motorway Shield (Blue body + Red-White-Blue Thai tricolor top header)
+    function addThailandMotorwayShield(id, w, h) {
+      if (map.hasImage(id)) map.removeImage(id);
+      const canvas = document.createElement('canvas');
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+      ctx.clearRect(0, 0, w, h);
+
+      const x = 4, y = 4, rw = w - 8, rh = h - 8, r = 8;
+      function traceBox() {
+        ctx.beginPath();
+        ctx.moveTo(x + r, y);
+        ctx.lineTo(x + rw - r, y);
+        ctx.quadraticCurveTo(x + rw, y, x + rw, y + r);
+        ctx.lineTo(x + rw, y + rh - r);
+        ctx.quadraticCurveTo(x + rw, y + rh, x + rw - r, y + rh);
+        ctx.lineTo(x + r, y + rh);
+        ctx.quadraticCurveTo(x, y + rh, x, y + rh - r);
+        ctx.lineTo(x, y + r);
+        ctx.quadraticCurveTo(x, y, x + r, y);
+        ctx.closePath();
+      }
+
+      ctx.save();
+      ctx.shadowColor = isDay ? 'rgba(17, 22, 28, 0.32)' : 'rgba(0, 0, 0, 0.68)';
+      ctx.shadowBlur = 4;
+      ctx.shadowOffsetY = 1.5;
+      traceBox();
+      ctx.fillStyle = '#0047AB';
+      ctx.fill();
+      ctx.restore();
+
+      // Red-white-blue tricolor top header strip
+      ctx.save();
+      traceBox();
+      ctx.clip();
+      ctx.fillStyle = '#CE1126';
+      ctx.fillRect(x, y, rw, 8.5);
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fillRect(x, y + 8.5, rw, 3.0);
+      ctx.restore();
+
+      traceBox();
+      ctx.lineWidth = 2.4;
+      ctx.strokeStyle = '#FFFFFF';
+      ctx.stroke();
+
+      map.addImage(id, ctx.getImageData(0, 0, w, h), { pixelRatio: 2 });
+    }
+
+    // Philippines DPWH National Highway Shield (White pointed-top pentagon / house shape)
+    function addPhilippinesNationalPentagon(id, w, h) {
+      if (map.hasImage(id)) map.removeImage(id);
+      const canvas = document.createElement('canvas');
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+      ctx.clearRect(0, 0, w, h);
+
+      const cx = w / 2;
+      const left = 5, right = w - 5, top = 4.5, bottom = h - 5;
+      const roofY = top + Math.round((bottom - top) * 0.30);
+      const outerPts = [
+        [cx, top],
+        [right, roofY],
+        [right, bottom],
+        [left, bottom],
+        [left, roofY]
+      ];
+      const innerPts = [
+        [cx, top + 4.2],
+        [right - 4.0, roofY + 2.4],
+        [right - 4.0, bottom - 4.0],
+        [left + 4.0, bottom - 4.0],
+        [left + 4.0, roofY + 2.4]
+      ];
+
+      ctx.save();
+      ctx.shadowColor = isDay ? 'rgba(17, 22, 28, 0.34)' : 'rgba(0, 0, 0, 0.70)';
+      ctx.shadowBlur = 4.2;
+      ctx.shadowOffsetY = 1.5;
+      traceRoundedPolygon(ctx, outerPts, 3.5);
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fill();
+      ctx.restore();
+
+      traceRoundedPolygon(ctx, outerPts, 3.5);
+      ctx.lineWidth = 1.4;
+      ctx.strokeStyle = '#242C36';
+      ctx.stroke();
+
+      traceRoundedPolygon(ctx, innerPts, 2.2);
+      ctx.lineWidth = 2.8;
+      ctx.strokeStyle = '#11161C';
+      ctx.stroke();
+
+      map.addImage(id, ctx.getImageData(0, 0, w, h), { pixelRatio: 2 });
+    }
+
+    for (const sz of hexSizes) {
+      addIndonesiaNationalShield('karta-shield-id-nat-' + sz.key, sz.w, sz.h);
+      addMalaysianJkrHexShield('karta-shield-id-tol-' + sz.key, sz.w, sz.h, {
+        fill: '#006B44',
+        innerBorder: '#FFD100',
+        innerBorderWidth: 2.8,
+        innerInset: 4.0,
+        outerStroke: '#FFFFFF',
+        outerHaloWidth: 1.6
+      });
+      addThailandHighwayShield('karta-shield-th-hwy-' + sz.key, sz.w + 2, sz.h + 4);
+      addThailandMotorwayShield('karta-shield-th-mwy-' + sz.key, sz.w, sz.h - 4);
+      addPhilippinesNationalPentagon('karta-shield-ph-nat-' + sz.key, sz.w, sz.h - 2);
+      addLaosNationalShield('karta-shield-la-nat-' + sz.key, sz.w, sz.h - 4);
+      addCambodiaNationalShield('karta-shield-kh-nat-' + sz.key, sz.w, sz.h - 2);
     }
 
     // Legacy compatibility aliases
@@ -937,6 +1750,7 @@
       { id: 'karta-poi-ev',       bg: '#16A34A', glyph: 'ev' },
       { id: 'karta-poi-health',   bg: '#DC2626', glyph: 'health' },
       { id: 'karta-poi-transit',  bg: '#0284C7', glyph: 'transit' },
+      { id: 'karta-poi-rail-station', bg: '#1D4ED8', glyph: 'transit' },
       { id: 'karta-poi-airport',  bg: '#1D4ED8', glyph: 'airport' },
       { id: 'karta-poi-park',     bg: '#15803D', glyph: 'park' },
       { id: 'karta-poi-landmark', bg: '#7C3AED', glyph: 'landmark' },
@@ -1119,6 +1933,130 @@
       }
 
       map.addImage(spec.id, ctx.getImageData(0, 0, w, h), { pixelRatio: 2 });
+    }
+
+    // Crisp elevated circular medallions for curated SEA Landmarks, International Airports,
+    // Iconic Religious Places (Mosques, Temples, Churches), and Major Rail Hubs.
+    const featuredSpecs = [
+      { id: 'karta-feat-historic', bg: '#B45309', ring: '#FDE68A', glyph: 'historic' },
+      { id: 'karta-feat-modern',   bg: '#0F766E', ring: '#99F6E4', glyph: 'modern' },
+      { id: 'karta-feat-airport',  bg: '#1D4ED8', ring: '#BFDBFE', glyph: 'airport' },
+      { id: 'karta-feat-mosque',   bg: '#047857', ring: '#A7F3D0', glyph: 'mosque' },
+      { id: 'karta-feat-temple',   bg: '#D97706', ring: '#FDE68A', glyph: 'temple' },
+      { id: 'karta-feat-church',   bg: '#6D28D9', ring: '#DDD6FE', glyph: 'church' },
+      { id: 'karta-feat-rail',     bg: '#0369A1', ring: '#BAE6FD', glyph: 'rail' }
+    ];
+
+    for (const fs of featuredSpecs) {
+      if (map.hasImage(fs.id)) map.removeImage(fs.id);
+      const w = 56, h = 64;
+      const canvas = document.createElement('canvas');
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) continue;
+      ctx.clearRect(0, 0, w, h);
+
+      const cx = w / 2, cy = 24, rad = 20;
+      ctx.save();
+      ctx.shadowColor = isDay ? 'rgba(17, 22, 28, 0.36)' : 'rgba(0, 0, 0, 0.78)';
+      ctx.shadowBlur = 7;
+      ctx.shadowOffsetY = 2.5;
+      ctx.beginPath();
+      ctx.arc(cx, cy, rad, Math.PI * 0.20, Math.PI * 0.80, true);
+      ctx.lineTo(cx, h - 4);
+      ctx.closePath();
+      ctx.fillStyle = fs.bg;
+      ctx.fill();
+      ctx.restore();
+
+      // Double halo ring for tourist landmark prominence
+      ctx.beginPath();
+      ctx.arc(cx, cy, rad, Math.PI * 0.20, Math.PI * 0.80, true);
+      ctx.lineTo(cx, h - 4);
+      ctx.closePath();
+      ctx.lineWidth = 3.2;
+      ctx.strokeStyle = '#FFFFFF';
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.arc(cx, cy, rad - 4.2, 0, Math.PI * 2);
+      ctx.lineWidth = 1.6;
+      ctx.strokeStyle = fs.ring;
+      ctx.stroke();
+
+      ctx.fillStyle = '#FFFFFF';
+      ctx.strokeStyle = '#FFFFFF';
+      ctx.lineWidth = 2.4;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+
+      switch (fs.glyph) {
+        case 'historic': // Classical temple/fortress columns
+          ctx.fillRect(cx - 9, cy + 6.5, 18, 2.6);
+          ctx.beginPath();
+          ctx.moveTo(cx - 9.5, cy - 2); ctx.lineTo(cx, cy - 9.5); ctx.lineTo(cx + 9.5, cy - 2);
+          ctx.closePath(); ctx.fill();
+          ctx.fillRect(cx - 6.8, cy - 1.5, 2.6, 8);
+          ctx.fillRect(cx - 1.3, cy - 1.5, 2.6, 8);
+          ctx.fillRect(cx + 4.2, cy - 1.5, 2.6, 8);
+          break;
+        case 'modern': // Twin skyline spire / star
+          ctx.beginPath();
+          ctx.moveTo(cx - 4.5, cy + 8); ctx.lineTo(cx - 4.5, cy - 5); ctx.lineTo(cx - 2.5, cy - 10);
+          ctx.lineTo(cx - 0.5, cy - 5); ctx.lineTo(cx - 0.5, cy + 8); ctx.closePath(); ctx.fill();
+          ctx.beginPath();
+          ctx.moveTo(cx + 0.5, cy + 8); ctx.lineTo(cx + 0.5, cy - 5); ctx.lineTo(cx + 2.5, cy - 10);
+          ctx.lineTo(cx + 4.5, cy - 5); ctx.lineTo(cx + 4.5, cy + 8); ctx.closePath(); ctx.fill();
+          ctx.fillRect(cx - 2.5, cy - 1, 5, 2.2);
+          break;
+        case 'airport': // Jet airplane
+          ctx.beginPath();
+          ctx.moveTo(cx, cy - 10); ctx.lineTo(cx, cy + 9);
+          ctx.moveTo(cx - 9.5, cy - 1.5); ctx.lineTo(cx + 9.5, cy - 1.5);
+          ctx.moveTo(cx - 4.5, cy + 6.5); ctx.lineTo(cx + 4.5, cy + 6.5);
+          ctx.stroke();
+          break;
+        case 'mosque': // Mosque dome & spire
+          ctx.beginPath();
+          ctx.arc(cx, cy + 0.5, 7.6, Math.PI, 0);
+          ctx.lineTo(cx + 7.6, cy + 8);
+          ctx.lineTo(cx - 7.6, cy + 8);
+          ctx.closePath();
+          ctx.fill();
+          ctx.beginPath();
+          ctx.moveTo(cx, cy - 10.5); ctx.lineTo(cx, cy - 6.8);
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.arc(cx, cy - 10.5, 2.0, 0, Math.PI * 2);
+          ctx.fill();
+          break;
+        case 'temple': // Tiered Southeast Asian pagoda / stupa
+          ctx.beginPath();
+          ctx.moveTo(cx, cy - 10.5); ctx.lineTo(cx + 5, cy - 4); ctx.lineTo(cx - 5, cy - 4); ctx.closePath(); ctx.fill();
+          ctx.beginPath();
+          ctx.moveTo(cx - 7.5, cy - 2); ctx.lineTo(cx + 7.5, cy - 2); ctx.lineTo(cx + 9, cy + 2); ctx.lineTo(cx - 9, cy + 2); ctx.closePath(); ctx.fill();
+          ctx.fillRect(cx - 6.5, cy + 2.5, 13, 5.5);
+          break;
+        case 'church': // Cathedral cross
+          ctx.fillRect(cx - 2.2, cy - 9.5, 4.4, 18.5);
+          ctx.fillRect(cx - 7.5, cy - 4.2, 15, 4.2);
+          break;
+        case 'rail': // High-speed train front
+          ctx.strokeRect(cx - 6.5, cy - 8, 13, 13.5);
+          ctx.fillRect(cx - 4.5, cy - 5.8, 9, 5);
+          ctx.beginPath();
+          ctx.arc(cx - 3.2, cy + 2.6, 1.5, 0, Math.PI * 2);
+          ctx.arc(cx + 3.2, cy + 2.6, 1.5, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.beginPath();
+          ctx.moveTo(cx - 5, cy + 8.5); ctx.lineTo(cx - 3, cy + 5.5);
+          ctx.moveTo(cx + 5, cy + 8.5); ctx.lineTo(cx + 3, cy + 5.5);
+          ctx.stroke();
+          break;
+      }
+
+      map.addImage(fs.id, ctx.getImageData(0, 0, w, h), { pixelRatio: 2 });
     }
   }
 
@@ -1576,6 +2514,54 @@
       });
     }
 
+    // Curated Clickable SEA Landmarks, International Airports, Religious Places & Rail Hubs
+    if (!map.getSource('karta-featured-places')) {
+      map.addSource('karta-featured-places', { type: 'geojson', data: emptyFC });
+      map.addLayer({
+        id: 'karta-featured-places-icons',
+        type: 'symbol',
+        source: 'karta-featured-places',
+        filter: ['>=', ['zoom'], ['coalesce', ['get', 'minZoom'], 8.5]],
+        layout: {
+          'icon-image': ['concat', 'karta-feat-', ['coalesce', ['get', 'kind'], 'historic']],
+          'icon-size': ['interpolate', ['linear'], ['zoom'], 5.5, 0.56, 10, 0.76, 14, 0.94, 17, 1.06],
+          'icon-anchor': 'bottom',
+          'icon-allow-overlap': false,
+          'symbol-sort-key': ['coalesce', ['get', 'sortKey'], 10],
+          'text-field': ['coalesce', ['get', 'shortLabel'], ['get', 'name']],
+          'text-font': ['Open Sans Semibold'],
+          'text-size': ['interpolate', ['linear'], ['zoom'], 5.5, 9.8, 10, 11.2, 15, 13.0],
+          'text-offset': [0, 0.25],
+          'text-anchor': 'top',
+          'text-max-width': 10,
+          'text-optional': true
+        },
+        paint: {
+          'text-color': isDay ? '#11161C' : '#F4F6F8',
+          'text-halo-color': isDay ? '#FCFBF8' : '#0D0F12',
+          'text-halo-width': 2.2,
+          'icon-opacity': 0.99,
+          'text-opacity': 0.98
+        }
+      });
+      map.on('click', 'karta-featured-places-icons', (e) => {
+        const feats = map.queryRenderedFeatures(e.point, { layers: ['karta-featured-places-icons'] });
+        if (!feats || !feats.length) return;
+        const placeId = String((feats[0].properties && feats[0].properties.id) || '');
+        if (placeId && typeof state.onFeaturedPlaceTap === 'function') {
+          e.originalEvent && e.originalEvent.stopPropagation && e.originalEvent.stopPropagation();
+          state.poiClickHandledAt = performance.now();
+          state.onFeaturedPlaceTap(placeId);
+        }
+      });
+      map.on('mouseenter', 'karta-featured-places-icons', () => {
+        map.getCanvas().style.cursor = 'pointer';
+      });
+      map.on('mouseleave', 'karta-featured-places-icons', () => {
+        map.getCanvas().style.cursor = '';
+      });
+    }
+
     if (!map.getSource('karta-user-accuracy')) {
       map.addSource('karta-user-accuracy', { type: 'geojson', data: emptyFC });
       map.addLayer({
@@ -1748,6 +2734,10 @@
     if (state.pendingCarpool !== undefined) updateCarpoolInternal(state, state.pendingCarpool);
     if (state.pendingUserLocation) updateUserLocationInternal(state, state.pendingUserLocation);
     if (state.pendingDroppedPin) updateDroppedPinInternal(state, state.pendingDroppedPin);
+    if (state.pendingFeaturedPlaces) updateFeaturedPlacesInternal(state, state.pendingFeaturedPlaces);
+    if (state.mapLanguage && state.mapLanguage !== 'en') {
+      applyMapLanguageInternal(state, state.mapLanguage);
+    }
     if (state.vehicleVisible && state.vehiclePose) {
       update2DNavArrowSource(
         state,
@@ -1956,6 +2946,65 @@
       geometry: { type: 'Point', coordinates: [p.lon, p.lat] }
     }));
     map.getSource('karta-pois').setData({ type: 'FeatureCollection', features });
+  }
+
+  function updateFeaturedPlacesInternal(state, places) {
+    const map = state.map;
+    if (!map || !map.getSource('karta-featured-places')) return;
+    const sortWeight = { airport: 1, modern: 2, historic: 3, mosque: 4, temple: 5, church: 6, rail: 7 };
+    const features = (places || []).map((p) => {
+      const label = p.iataCode ? `${p.shortLabel || p.name} (${p.iataCode})` : (p.shortLabel || p.name);
+      return {
+        type: 'Feature',
+        properties: {
+          id: p.id,
+          name: p.name,
+          shortLabel: label,
+          kind: p.kind || 'historic',
+          countryCode: p.countryCode || '',
+          iataCode: p.iataCode || '',
+          minZoom: typeof p.minZoom === 'number' ? p.minZoom : 8.5,
+          sortKey: sortWeight[p.kind] || 10
+        },
+        geometry: { type: 'Point', coordinates: [p.lon, p.lat] }
+      };
+    });
+    map.getSource('karta-featured-places').setData({ type: 'FeatureCollection', features });
+  }
+
+  function applyMapLanguageInternal(state, langCode) {
+    const map = state.map;
+    if (!map || !state.styleLoaded) return;
+    // Latin-script SEA languages supported cleanly by MapLibre PBF glyphs
+    const latinSafe = new Set(['en', 'ms', 'id', 'vi', 'pt', 'tl']);
+    const code = latinSafe.has(String(langCode || 'en').toLowerCase())
+      ? String(langCode).toLowerCase()
+      : 'en';
+    const placeTextExpr = code === 'en'
+      ? ['coalesce', ['get', 'name:en'], ['get', 'name']]
+      : ['coalesce', ['get', 'name:' + code], ['get', 'name:en'], ['get', 'name']];
+    const roadTextExpr = code === 'en'
+      ? ['coalesce', ['get', 'name:en'], ['get', 'name'], ['get', 'ref']]
+      : ['coalesce', ['get', 'name:' + code], ['get', 'name:en'], ['get', 'name'], ['get', 'ref']];
+    const airportTextExpr = code === 'en'
+      ? ['coalesce', ['get', 'name:en'], ['get', 'name'], ['get', 'iata']]
+      : ['coalesce', ['get', 'name:' + code], ['get', 'name:en'], ['get', 'name'], ['get', 'iata']];
+
+    const placeLayers = ['places_label', 'place_suburb_neighbourhood', 'poi_landmarks', 'poi_rail_station', 'water_name', 'rail_label'];
+    for (const lid of placeLayers) {
+      if (map.getLayer(lid)) {
+        try { map.setLayoutProperty(lid, 'text-field', placeTextExpr); } catch (_) {}
+      }
+    }
+    const roadLayers = ['roads_label_major', 'roads_label_minor'];
+    for (const lid of roadLayers) {
+      if (map.getLayer(lid)) {
+        try { map.setLayoutProperty(lid, 'text-field', roadTextExpr); } catch (_) {}
+      }
+    }
+    if (map.getLayer('aerodrome_label')) {
+      try { map.setLayoutProperty('aerodrome_label', 'text-field', airportTextExpr); } catch (_) {}
+    }
   }
 
   function updateGantriesInternal(state, _gantries) {
@@ -2359,6 +3408,8 @@
         onHazardPinTap: null,
         onPoiPinTap: null,
         onRouteCalloutTap: null,
+        onFeaturedPlaceTap: null,
+        onVectorFeatureTap: null,
         onViewportChanged: null,
         poiClickHandledAt: 0,
         viewportTimer: null,
@@ -2371,6 +3422,8 @@
         pendingDroppedPin: null,
         pendingTurnArrows: null,
         pendingSavedPlaces: null,
+        pendingFeaturedPlaces: null,
+        mapLanguage: 'en',
         fuelMarkers: [],
         pendingRoutes: null,
         pendingPois: null,
@@ -2386,11 +3439,15 @@
         vehicleStyle: { avatar: 'karta_pin_3d', accentHex: '#5B9A94', showHaloRing: true, scale: 1.0 }
       };
 
+      const clampedLat = Math.max(SEA_BOUNDS[1], Math.min(SEA_BOUNDS[3], lat));
+      const clampedLon = Math.max(SEA_BOUNDS[0], Math.min(SEA_BOUNDS[2], lon));
       const map = new window.maplibregl.Map({
         container,
         style: styleObj,
-        center: [lon, lat],
-        zoom: zoom || 15.2,
+        center: [clampedLon, clampedLat],
+        zoom: Math.max(3.8, zoom || 15.2),
+        minZoom: 3.8,
+        maxBounds: SEA_MAX_BOUNDS,
         pitch: Math.min(pitch || 45, 58),
         bearing: -18,
         maxPitch: 60,
@@ -2404,7 +3461,7 @@
 
       map.on('styleimagemissing', (e) => {
         if (!e || !e.id) return;
-        if (e.id.startsWith('karta-poi-') || e.id.startsWith('karta-shield-')) {
+        if (e.id.startsWith('karta-poi-') || e.id.startsWith('karta-shield-') || e.id.startsWith('karta-feat-')) {
           registerGoogleStyleSprites(map, state.lightingMode === 'day');
         } else if (e.id.startsWith('karta-chevron-')) {
           registerChevronSprites(map, state.lightingMode === 'day');
@@ -2429,6 +3486,40 @@
 
       map.on('click', (e) => {
         if (performance.now() - (state.poiClickHandledAt || 0) < 120) return;
+
+        // 1. Check interactive vector-tile train stations, airports, religious places & landmarks
+        const clickableLayers = ['poi_rail_station', 'aerodrome_label', 'poi_landmarks']
+          .filter(id => !!map.getLayer(id));
+        if (clickableLayers.length > 0 && typeof state.onVectorFeatureTap === 'function') {
+          const hitBox = [
+            [e.point.x - 14, e.point.y - 14],
+            [e.point.x + 14, e.point.y + 14]
+          ];
+          const feats = map.queryRenderedFeatures(hitBox, { layers: clickableLayers });
+          if (feats && feats.length > 0) {
+            const f = feats[0];
+            const props = f.properties || {};
+            const featName = String(props['name:en'] || props.name || props.iata || '').trim();
+            if (featName) {
+              const geomCoords = (f.geometry && f.geometry.type === 'Point' && Array.isArray(f.geometry.coordinates))
+                ? f.geometry.coordinates
+                : [e.lngLat.lng, e.lngLat.lat];
+              const fClass = String(props.class || props.kind || (f.layer && f.layer.id === 'aerodrome_label' ? 'airport' : ''));
+              const fSubclass = String(props.subclass || props.kind_detail || (f.layer && f.layer.id === 'poi_rail_station' ? 'station' : ''));
+              state.onVectorFeatureTap(JSON.stringify({
+                name: featName,
+                featureClass: fClass,
+                subclass: fSubclass,
+                religion: props.religion ? String(props.religion) : null,
+                iata: props.iata ? String(props.iata) : null,
+                lat: Number(geomCoords[1]),
+                lon: Number(geomCoords[0])
+              }));
+              return;
+            }
+          }
+        }
+
         if (typeof onMapTap === 'function') {
           onMapTap(e.lngLat.lat, e.lngLat.lng);
         }
@@ -2504,12 +3595,14 @@
       const state = instances.get(containerId);
       if (!state || !state.map) return;
       const opts = JSON.parse(optionsJson);
+      const clampedLon = Math.max(SEA_BOUNDS[0], Math.min(SEA_BOUNDS[2], Number(opts.lon)));
+      const clampedLat = Math.max(SEA_BOUNDS[1], Math.min(SEA_BOUNDS[3], Number(opts.lat)));
       const cam = {
-        center: [opts.lon, opts.lat],
+        center: [clampedLon, clampedLat],
         duration: opts.durationMs ?? 550,
         essential: true
       };
-      if (opts.zoom !== undefined) cam.zoom = opts.zoom;
+      if (opts.zoom !== undefined) cam.zoom = Math.max(3.8, Number(opts.zoom));
       if (opts.pitch !== undefined) cam.pitch = opts.pitch;
       if (opts.bearing !== undefined) cam.bearing = opts.bearing;
       if (opts.padding) cam.padding = opts.padding;
@@ -2520,10 +3613,10 @@
       const state = instances.get(containerId);
       if (!state || !state.map) return;
       const opts = JSON.parse(optionsJson);
-      const minLat = Math.max(-85, Math.min(85, Number(opts.minLat)));
-      const maxLat = Math.max(-85, Math.min(85, Number(opts.maxLat)));
-      const minLon = Math.max(-180, Math.min(180, Number(opts.minLon)));
-      const maxLon = Math.max(-180, Math.min(180, Number(opts.maxLon)));
+      const minLat = Math.max(SEA_BOUNDS[1], Math.min(SEA_BOUNDS[3], Number(opts.minLat)));
+      const maxLat = Math.max(SEA_BOUNDS[1], Math.min(SEA_BOUNDS[3], Number(opts.maxLat)));
+      const minLon = Math.max(SEA_BOUNDS[0], Math.min(SEA_BOUNDS[2], Number(opts.minLon)));
+      const maxLon = Math.max(SEA_BOUNDS[0], Math.min(SEA_BOUNDS[2], Number(opts.maxLon)));
       if (![minLat, maxLat, minLon, maxLon].every(Number.isFinite)) return;
       const width = state.map.getContainer().clientWidth || 1200;
       const pad = opts.padding || { left: 80, top: 80, right: 80, bottom: 80 };
@@ -2561,6 +3654,21 @@
       const places = JSON.parse(payloadJson);
       state.pendingSavedPlaces = places;
       if (state.styleLoaded) updateSavedPlacesInternal(state, places);
+    },
+
+    setFeaturedPlaces(containerId, payloadJson) {
+      const state = instances.get(containerId);
+      if (!state) return;
+      const places = JSON.parse(payloadJson);
+      state.pendingFeaturedPlaces = places;
+      if (state.styleLoaded) updateFeaturedPlacesInternal(state, places);
+    },
+
+    setMapLanguage(containerId, langCode) {
+      const state = instances.get(containerId);
+      if (!state) return;
+      state.mapLanguage = String(langCode || 'en').toLowerCase();
+      if (state.styleLoaded) applyMapLanguageInternal(state, state.mapLanguage);
     },
 
     setPois(containerId, payloadJson) {
@@ -2772,7 +3880,7 @@
       if (!state) return;
       const loc = { lat, lon, headingDeg, accuracyMeters, visible };
       state.pendingUserLocation = loc;
-      if (state.styleLoaded) updateUserLocationInternal(state, loc);
+      if (state.map) updateUserLocationInternal(state, loc);
     },
 
     setDroppedPin(containerId, lat, lon, label, visible) {
@@ -2792,6 +3900,13 @@
       state.onViewportChanged = onViewportChanged;
       state.onRouteCalloutTap = onRouteCalloutTap;
       if (state.styleLoaded) scheduleEmitViewportBounds(state);
+    },
+
+    registerPlaceCallbacks(containerId, onFeaturedPlaceTap, onVectorFeatureTap) {
+      const state = instances.get(containerId);
+      if (!state) return;
+      state.onFeaturedPlaceTap = onFeaturedPlaceTap;
+      state.onVectorFeatureTap = onVectorFeatureTap;
     },
 
     destroy(containerId) {

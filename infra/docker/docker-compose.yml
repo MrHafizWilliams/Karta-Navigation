@@ -153,6 +153,7 @@ services:
       OFFLINE_PACKS_BASE_URL: ${KARTA_OFFLINE_PACKS_BASE_URL:-http://localhost:8000/v1/regions/downloads}
     volumes:
       - ../../data:/data
+      - ../../maps:/data/maps:ro
       - ../../pipelines:/pipelines:ro
       - ../valhalla:/config/valhalla:ro
     depends_on:
@@ -165,9 +166,10 @@ services:
     image: ghcr.io/onthegomap/planetiler:latest
     profiles: ["pipeline"]
     environment:
-      JAVA_TOOL_OPTIONS: -Xmx${PLANETILER_JAVA_XMX:-4g}
+      JAVA_TOOL_OPTIONS: -Xmx${PLANETILER_JAVA_XMX:-8g}
     volumes:
       - ../../data:/data
+      - ../../maps:/data/maps:ro
 
   valhalla-builder:
     image: ghcr.io/valhalla/valhalla-scripted:latest
@@ -180,6 +182,7 @@ services:
       OFFLINE_PACKS_BASE_URL: ${KARTA_OFFLINE_PACKS_BASE_URL:-http://localhost:8000/v1/regions/downloads}
     volumes:
       - ../../data:/data
+      - ../../maps:/data/maps:ro
       - ../../pipelines:/pipelines:ro
       - ../valhalla:/config/valhalla:ro
 

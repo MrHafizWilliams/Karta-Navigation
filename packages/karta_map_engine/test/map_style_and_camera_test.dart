@@ -108,5 +108,164 @@ void main() {
       ctrl.setLightingMode(KartaVisualMode.tropicalDaylight);
       expect(ctrl.lightingMode, equals(KartaVisualMode.tropicalDaylight));
     });
+
+    test('KartaMapController replays buffered startup GPS location & camera move on attachDriver', () {
+      final ctrl = KartaMapController();
+      addTearDown(ctrl.dispose);
+
+      const penangGps = Coordinate(lat: 5.3840, lon: 100.4128);
+      // Simulate real-time GPS lock arriving BEFORE MapLibre finishes initializing
+      ctrl.setUserLocation(
+        coordinate: penangGps,
+        headingDeg: 90.0,
+        accuracyMeters: 12.0,
+        visible: true,
+      );
+      ctrl.easeTo(
+        center: penangGps,
+        zoom: 15.6,
+        pitch: 48.0,
+        durationMs: 750,
+      );
+
+      final fakeDriver = _RecordingMapDriver();
+      ctrl.attachDriver(fakeDriver);
+
+      expect(fakeDriver.lastUserLocation, equals(penangGps));
+      expect(fakeDriver.lastUserLocationVisible, isTrue);
+      expect(fakeDriver.lastEasedCenter, equals(penangGps));
+      expect(fakeDriver.lastEasedZoom, equals(15.6));
+    });
   });
+}
+
+class _RecordingMapDriver implements KartaMapPlatformDriver {
+  Coordinate? lastUserLocation;
+  bool lastUserLocationVisible = false;
+  Coordinate? lastEasedCenter;
+  double? lastEasedZoom;
+
+  @override
+  void easeCamera({
+    required Coordinate center,
+    double? zoom,
+    double? pitch,
+    double? bearing,
+    int durationMs = 600,
+    double paddingTop = 0,
+    double paddingBottom = 0,
+    double paddingLeft = 0,
+  }) {
+    lastEasedCenter = center;
+    lastEasedZoom = zoom;
+  }
+
+  @override
+  void setUserLocation({
+    required Coordinate? coordinate,
+    double? headingDeg,
+    double accuracyMeters = 15.0,
+    bool visible = true,
+  }) {
+    lastUserLocation = coordinate;
+    lastUserLocationVisible = visible;
+  }
+
+  @override
+  void fitBounds({
+    required double minLon,
+    required double minLat,
+    required double maxLon,
+    required double maxLat,
+    double paddingLeft = 420,
+    double paddingTop = 80,
+    double paddingRight = 80,
+    double paddingBottom = 100,
+  }) {}
+
+  @override
+  void prefetchVectorTiles(List<VectorTileCoord> tiles) {}
+
+  @override
+  void set3DBuildingsEnabled(bool enabled) {}
+
+  @override
+  void setCarpoolOverlay(CarpoolMapOverlay? overlay) {}
+
+  @override
+  void setDrivingSpeed({required double speedKmh, required bool declutterMinorLabels}) {}
+
+  @override
+  void setDroppedPin({required Coordinate? coordinate, String? label}) {}
+
+  @override
+  void setFuelPins(List<FuelStationComparison> stations) {}
+
+  @override
+  void setHazards(List<HazardRecord> hazards) {}
+
+  @override
+  void setLightingMode(KartaVisualMode mode) {}
+
+  @override
+  void setLookAroundOrbit({
+    required Coordinate center,
+    required double bearingDeg,
+    required bool active,
+  }) {}
+
+  @override
+  void setPmtilesUrl(String url) {}
+
+  @override
+  void setPois(List<PoiItem> pois) {}
+
+  @override
+  void setRoutes({
+    required List<List<Coordinate>> routePolylines,
+    required int selectedIndex,
+    int? tollFreeIndex,
+    required List<KartaMapStopPin> stops,
+    List<KartaMapRouteCallout> callouts = const <KartaMapRouteCallout>[],
+    List<KartaMapTurnArrow> turnArrows = const <KartaMapTurnArrow>[],
+  }) {}
+
+  @override
+  void setSavedPlaces(List<KartaMapSavedPlacePin> savedPlaces) {}
+
+  @override
+  void setFeaturedPlaces(List<KartaMapFeaturedPin> places) {}
+
+  @override
+  void setMapLanguage(String languageCode) {}
+
+  @override
+  void setThermalRenderProfile({
+    required int targetFps,
+    required bool enable3DBuildings,
+    required bool pausedForProjection,
+  }) {}
+
+  @override
+  void setTollGantries(List<GantryInfo> gantries) {}
+
+  @override
+  void setTrafficSegments({
+    required List<Coordinate> routePoints,
+    required List<CongestionSegment> segments,
+  }) {}
+
+  @override
+  void setTurnArrows(List<KartaMapTurnArrow> turnArrows) {}
+
+  @override
+  void setVehicleCustomization(KartaVehicleCustomization customization) {}
+
+  @override
+  void setVehiclePose({
+    required Coordinate coordinate,
+    required double bearingDeg,
+    required double speedKmh,
+    required bool visible,
+  }) {}
 }

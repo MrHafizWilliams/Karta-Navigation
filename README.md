@@ -1,11 +1,11 @@
 <p align="center">
-  <img src="assets/logo/karta_logo.png" alt="Karta Navigation Logo" width="140" />
+  <img src="packages/karta_design_system/assets/karta_logo.png" alt="Karta Navigation Logo" width="140" />
 </p>
 
 <h1 align="center">Karta Navigation Platform</h1>
 
 <p align="center">
-  <strong>Dark-first cross-platform, offline-capable &amp; automotive navigation platform engineered for Malaysia (MY), Singapore (SG), and Brunei Darussalam (BN).</strong>
+  <strong>Dark-first cross-platform, offline-capable &amp; automotive navigation platform engineered for Southeast Asia (all 11 countries, anchored on Malaysia, Singapore, and Brunei Darussalam).</strong>
 </p>
 
 <p align="center">
@@ -13,22 +13,25 @@
   <img src="https://img.shields.io/badge/Backend-FastAPI%20%2B%20gRPC-009688?logo=fastapi&logoColor=white" alt="FastAPI + gRPC" />
   <img src="https://img.shields.io/badge/Geospatial-PostGIS%20%2B%20Valhalla%20%2B%20PMTiles-5B9A94" alt="PostGIS + Valhalla + PMTiles" />
   <img src="https://img.shields.io/badge/Automotive-CarPlay%20%26%20Android%20Auto-181C22" alt="CarPlay & Android Auto" />
-  <img src="https://img.shields.io/badge/Region-MY%20%7C%20SG%20%7C%20BN-5B9A94" alt="Region MY SG BN" />
+  <img src="https://img.shields.io/badge/Region-Southeast%20Asia%20(11%20Countries)-5B9A94" alt="Region Southeast Asia" />
+  <img src="https://img.shields.io/badge/Languages-11%20Regional%20Locales-5B9A94" alt="11 Regional Locales" />
 </p>
 
 ---
 
 ## Overview
 
-**Karta** is a full-stack, dark-first navigation monorepo built from the ground up for Southeast Asia's interconnected **Malaysia, Singapore, and Brunei** road networks. Rather than relying on mocked routing or opaque third-party black boxes, Karta integrates real **OpenStreetMap**, **PostGIS**, **Valhalla**, **Redis Geo / Pub/Sub**, **MapLibre**, and **PMTiles** across a 6-platform **Flutter** client and decoupled native **Apple CarPlay** & **Android Auto** projection modules.
+**Karta** is a full-stack, dark-first navigation monorepo built from the ground up for **Southeast Asia's** interconnected road networks—with deep toll, transit, and offline testbed coverage across **Malaysia (MY), Singapore (SG), and Brunei Darussalam (BN)** and full 11-country SEA support spanning **Indonesia, Thailand, Philippines, Vietnam, Myanmar, Laos, Cambodia, and Timor-Leste**. Rather than relying on mocked routing or opaque third-party black boxes, Karta integrates real **OpenStreetMap**, **PostGIS**, **Valhalla** (plus transparent public FOSSGIS Valhalla / OSRM fallback when local Docker is offline), **Redis Geo / Pub/Sub**, **MapLibre**, and **PMTiles** across a 6-platform **Flutter** client (including Android mobile WebView MapLibre host) and decoupled native **Apple CarPlay** & **Android Auto** projection modules.
 
 ### Key Highlights
 
-- **Regional Toll & Currency Engine (MY / SG / BN)** — Automatic GPS-driven currency switching (`MYR` / `RM`, `SGD` / `$`, `BND` / `B$`) with real pre-route toll calculation and toll-free savings comparisons:
+- **11-Country Southeast Asia Coverage & Regional Toll/Currency Engine** — Automatic GPS-driven currency switching across all 11 SEA countries (`MYR`/`RM`, `SGD`/`$`, `BND`/`B$`, `IDR`/`Rp`, `THB`/`฿`, `PHP`/`₱`, `VND`/`₫`, `MMK`/`Ks`, `LAK`/`₭`, `KHR`/`៛`, `USD`/`$`) with real pre-route toll calculation and toll-free savings comparisons:
   - **Malaysia**: PLUS closed distance-matrix (`E1`/`E2` NSE, NKVE, ELITE — Touch 'n Go, SmartTAG, RFID, PLUS JustGO ANPR), open-barrier Klang Valley expressways (`LDP E11`, `SPRINT E23`, `DUKE E33`, `KESAS E5`, `AKLEH E12`, `SUKE E19`), Penang Bridge (`E36`), and MY–SG border checkpoints (BSI CIQ & Linkedua including RM 20.00 Road Charge).
   - **Singapore**: Time-varying LTA ERP gantry schedules across CTE, AYE, ECP/MCE, and CBD cordons.
   - **Brunei**: JKR Rasau / Sungai Teraban toll bridge & regional holiday schedules.
-- **Multi-Modal & Offline-Ready Routing** — 7 Valhalla costing profiles (`drive_fastest`, `drive_avoid_tolls`, `drive_no_highways`, `drive_motorcycle`, `walk`, `cycle`, `transit` via RapidKL/Prasarana & SG GTFS), plus 6 downloadable regional offline packs (`.pmtiles` + `valhalla_tiles.tar` + offline SQLite tolls + local fuzzy POI index) with ~5 km cross-border overlap buffers and a C++ `libvalhalla` FFI shim.
+- **11-Language Native Localization & Border-Crossing Welcomes** — Full UI + map-label localization (`English`, `Bahasa Melayu`, `Bahasa Indonesia`, `中文 (简体)`, `ภาษาไทย`, `မြန်မာဘာသာ`, `Tiếng Việt`, `ភាសាខ្មែរ`, `ພາသາລາວ`, `Português`, `Tagalog`) plus active-navigation state/province/district border-crossing greeting banners with authentic official flags.
+- **Floating Explore UX, Curated SEA Places & Branded Launch Intro** — Google Maps–inspired floating top search bar & category chips leaving ~95% of the 3D map unobstructed, rich info cards for curated Southeast Asian landmarks/airports/transit/places of worship, and an animated MP4 launch splash (`KartaIntroSplashOverlay`).
+- **Multi-Modal, Offline-Ready & Resilient Routing** — 7 Valhalla costing profiles (`drive_fastest`, `drive_avoid_tolls`, `drive_no_highways`, `drive_motorcycle`, `walk`, `cycle`, `transit` via RapidKL/Prasarana & SG GTFS), 14 downloadable offline regional packs across SEA (`.pmtiles` + `valhalla_tiles.tar` + offline SQLite tolls + local fuzzy POI index) with a C++ `libvalhalla` FFI shim, plus transparent open-source fallback (`PublicValhallaFallback` via FOSSGIS Valhalla & OSRM) when the self-hosted backend is offline.
 - **Real-Time Crowdsourcing & Dynamic Rerouting** — Low-latency WebSocket (`/v1/realtime/ws`) and gRPC (`RealtimeHazardService` on `:50051`) backed by Redis Geo & geohash5 Pub/Sub for 6 canonical road hazards (`Police`, `Accident`, `Pothole`, `Stopped Vehicle`, `Road Debris`, `Road Closure`), community voting, live traffic-weight updates, and automatic ETA/toll-delta reroute proposals.
 - **Hands-Free Regional Voice & Smart Commuter Suite** — Voice intent parser supporting **English, Bahasa Melayu, Manglish, and Singlish**, custom voice-pack recording studio, community fuel price comparison along routes, calendar-driven Time-to-Leave alerts (ICS), privacy-first carpool matching, and synced user accounts & saved places.
 - **Native Automotive Projection (CarPlay & Android Auto)** — Strictly decoupled native **Swift (`KartaCarPlay` / `CPMapTemplate`)** and **Kotlin (`karta-android-auto` / `NavigationTemplate`)** modules bridged via strongly-typed Pigeon contracts, with offline MapLibre projection, left-hand traffic clockwise roundabout mapping, 1-tap distraction-compliant hazard reporting, volatile RAM-only GPS privacy scrubbing, and dynamic thermal FPS/3D-extrusion throttling.
@@ -147,7 +150,7 @@ Karta/
 | **Phase 3** | **Real-Time Crowdsourcing, Voice & Commuter** | WebSocket + gRPC `RealtimeHazardService` (`:50051`), Redis geohash5 Pub/Sub, 6 hazard categories + radial report menu + voting/decay, dynamic traffic-weight injection & auto-reroute proposals, EN/BM/Manglish/Singlish voice intent parser, Custom Voice Pack Studio, community fuel prices along route, smart calendar Time-to-Leave (ICS), privacy-first carpool matching, user auth & saved places. |
 | **Phase 4** | **Native Automotive, Privacy & Thermal** | Standalone Apple CarPlay Swift Package (`native/ios/KartaCarPlay`) & Android Auto Kotlin library (`native/android/karta-android-auto`), Pigeon bridge (`packages/karta_automotive_bridge`), clockwise LHT roundabouts, offline localhost `.pmtiles` HTTP Range proxy for Android Auto, companion turn-list overlay, zero-disk volatile RAM GPS privacy guard, and dynamic thermal FPS/3D shedding. |
 
-### Downloadable Offline Regional Packs (`MY / SG / BN`)
+### Downloadable Offline Regional Packs (Southeast Asia — 14 Regions)
 
 | Region ID | Coverage | Countries |
 | :--- | :--- | :---: |
@@ -157,6 +160,14 @@ Karta/
 | `my-borneo` | Sabah, Sarawak, Labuan & Brunei transit buffer | `MY`, `BN` |
 | `sg` | Singapore island-wide & Woodlands / Tuas Checkpoint buffer | `SG`, `MY` |
 | `bn` | Brunei Darussalam incl. Temburong & Miri / Limbang border buffer | `BN`, `MY` |
+| `id` | Indonesia (Java, Sumatra, Bali, Kalimantan, Sulawesi & Papua) | `ID` |
+| `th` | Thailand (Bangkok, Northern, Isan, Eastern & Southern corridors) | `TH` |
+| `ph` | Philippines (Luzon, Metro Manila, Visayas & Mindanao) | `PH` |
+| `vn` | Vietnam (Hanoi, Da Nang, Ho Chi Minh City & Mekong Delta) | `VN` |
+| `mm` | Myanmar (Yangon, Naypyidaw, Mandalay & Border Highways) | `MM` |
+| `la` | Laos (Vientiane, Luang Prabang, Savannakhet & Pakse) | `LA` |
+| `kh` | Cambodia (Phnom Penh, Siem Reap, Sihanoukville & Battambang) | `KH` |
+| `tl` | Timor-Leste (Dili, Baucau, Suai & Oecusse) | `TL` |
 
 ---
 

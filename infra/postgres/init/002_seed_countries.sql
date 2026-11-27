@@ -39,6 +39,70 @@ VALUES
             ST_GeomFromText('MULTIPOLYGON(((114.07 4.00, 115.05 4.00, 115.05 5.06, 114.07 5.06, 114.07 4.00)), ((115.06 4.28, 115.36 4.28, 115.36 4.92, 115.06 4.92, 115.06 4.28)))', 4326)
         )
     ))
+),
+(
+    'ID', 'IDN', 'Indonesia', 'IDR', 'Rp',
+    TRUE, 0, 'left', 'kmh', 'Asia/Jakarta',
+    ST_Multi(ST_GeomFromText(
+        'POLYGON((94.80 -11.10, 141.10 -11.10, 141.10 5.95, 119.45 5.95, 119.45 0.80, 109.45 0.80, 109.45 1.10, 99.50 1.10, 94.80 5.95, 94.80 -11.10))',
+        4326
+    ))
+),
+(
+    'TH', 'THA', 'Thailand', 'THB', '฿',
+    FALSE, 2, 'left', 'kmh', 'Asia/Bangkok',
+    ST_Multi(ST_GeomFromText(
+        'POLYGON((97.35 5.60, 105.65 5.60, 105.65 20.48, 97.35 20.48, 97.35 5.60))',
+        4326
+    ))
+),
+(
+    'PH', 'PHL', 'Philippines', 'PHP', '₱',
+    FALSE, 2, 'right', 'kmh', 'Asia/Manila',
+    ST_Multi(ST_GeomFromText(
+        'POLYGON((116.85 4.55, 126.95 4.55, 126.95 21.15, 116.85 21.15, 116.85 4.55))',
+        4326
+    ))
+),
+(
+    'VN', 'VNM', 'Vietnam', 'VND', '₫',
+    FALSE, 0, 'right', 'kmh', 'Asia/Ho_Chi_Minh',
+    ST_Multi(ST_GeomFromText(
+        'POLYGON((102.14 8.35, 109.50 8.35, 109.50 23.40, 102.14 23.40, 102.14 8.35))',
+        4326
+    ))
+),
+(
+    'MM', 'MMR', 'Myanmar', 'MMK', 'Ks',
+    TRUE, 0, 'right', 'kmh', 'Asia/Yangon',
+    ST_Multi(ST_GeomFromText(
+        'POLYGON((92.18 9.60, 101.18 9.60, 101.18 28.55, 92.18 28.55, 92.18 9.60))',
+        4326
+    ))
+),
+(
+    'LA', 'LAO', 'Laos', 'LAK', '₭',
+    FALSE, 0, 'right', 'kmh', 'Asia/Vientiane',
+    ST_Multi(ST_GeomFromText(
+        'POLYGON((100.08 13.90, 107.65 13.90, 107.65 22.52, 100.08 22.52, 100.08 13.90))',
+        4326
+    ))
+),
+(
+    'KH', 'KHM', 'Cambodia', 'KHR', '៛',
+    FALSE, 0, 'right', 'kmh', 'Asia/Phnom_Penh',
+    ST_Multi(ST_GeomFromText(
+        'POLYGON((102.33 10.35, 107.63 10.35, 107.63 14.70, 102.33 14.70, 102.33 10.35))',
+        4326
+    ))
+),
+(
+    'TL', 'TLS', 'Timor-Leste', 'USD', '$',
+    FALSE, 2, 'left', 'kmh', 'Asia/Dili',
+    ST_Multi(ST_GeomFromText(
+        'MULTIPOLYGON(((124.94 -9.55, 127.35 -9.55, 127.35 -8.12, 124.94 -8.12, 124.94 -9.55)), ((124.04 -9.48, 124.48 -9.48, 124.48 -9.16, 124.04 -9.16, 124.04 -9.48)))',
+        4326
+    ))
 )
 ON CONFLICT (iso_a2) DO NOTHING;
 

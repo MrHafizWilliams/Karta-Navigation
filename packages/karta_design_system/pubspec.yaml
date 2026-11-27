@@ -12,6 +12,7 @@ resolution: workspace
 dependencies:
   flutter:
     sdk: flutter
+  video_player: ^2.9.2
   web: ^1.1.0
 
 dev_dependencies:
@@ -22,6 +23,8 @@ dev_dependencies:
 flutter:
   assets:
     - assets/karta_logo.png
+    - assets/karta_intro.mp4
+    - assets/flags/
   fonts:
     - family: Plus Jakarta Sans
       fonts:

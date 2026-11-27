@@ -9,7 +9,7 @@
 #>
 param(
     [Parameter(Position = 0)]
-    [ValidateSet("env", "up", "down", "logs", "ps", "pipeline", "pmtiles", "valhalla-build", "postgis-load", "tolls-load", "redis-sync", "test-api", "web-build", "flutter-test")]
+    [ValidateSet("env", "up", "down", "logs", "ps", "pipeline", "pmtiles", "valhalla-build", "postgis-load", "sea-build", "tolls-load", "redis-sync", "test-api", "web-build", "flutter-test")]
     [string]$Task = "ps",
 
     [string]$Region = "all",
@@ -67,6 +67,15 @@ switch ($Task) {
         & docker @BaseArgs --profile pipeline run --rm pipeline bash /pipelines/scripts/06_ingest_postgis.sh --region $Region
         & docker @BaseArgs --profile pipeline run --rm pipeline python3 /pipelines/scripts/07_load_tolls.py
         & docker @BaseArgs --profile pipeline run --rm pipeline python3 /pipelines/scripts/08_sync_redis_geo.py
+    }
+    "sea-build" {
+        Write-Host "[karta] Building unified 8-country Southeast Asia maps from Karta/maps/*.osm.pbf + MY/SG/BN..." -ForegroundColor Cyan
+        & docker @BaseArgs up -d postgres redis
+        & docker @BaseArgs --profile pipeline run --rm pipeline bash /pipelines/scripts/10_build_sea_maps.sh
+        & docker @BaseArgs --profile pipeline run --rm planetiler --download --osm-path="/data/raw/osm/sea-full.osm.pbf" --output="/data/pmtiles/sea-full.pmtiles" --force
+        & docker @BaseArgs --profile pipeline run --rm -e OSM_PBF_FILENAME=sea-full.osm.pbf valhalla-builder /pipelines/scripts/05_build_valhalla.sh --region all
+        & docker @BaseArgs --profile pipeline run --rm -e OSM_PBF_FILENAME=sea-full.osm.pbf pipeline bash /pipelines/scripts/06_ingest_postgis.sh --region all
+        Write-Host "[karta] 8-country ASEAN PMTiles (sea-full.pmtiles), Valhalla graph & PostGIS complete!" -ForegroundColor Green
     }
     "tolls-load" {
         & docker @BaseArgs up -d postgres redis

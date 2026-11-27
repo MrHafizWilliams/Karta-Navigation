@@ -153,14 +153,22 @@ class OfflineRegionManager {
     return regions;
   }
 
-  /// Groups the 6 regional packs into top-level Country Bundles
-  /// (Malaysia [4 packs], Singapore [1 pack], Brunei Darussalam [1 pack]).
+  /// Groups regional packs into top-level Country Bundles across all 8 ASEAN nations
+  /// (Malaysia, Singapore, Brunei, Indonesia, Thailand, Philippines, Vietnam, Myanmar).
   List<CountryOfflineBundle> groupedByCountry() {
     final my = _regions.values.where((r) => r.pack.regionId.startsWith('my-')).toList();
     final sg = _regions.values.where((r) => r.pack.regionId == 'sg').toList();
     final bn = _regions.values.where((r) => r.pack.regionId == 'bn').toList();
+    final id = _regions.values.where((r) => r.pack.regionId == 'id' || r.pack.regionId.startsWith('id-')).toList();
+    final th = _regions.values.where((r) => r.pack.regionId == 'th' || r.pack.regionId.startsWith('th-')).toList();
+    final ph = _regions.values.where((r) => r.pack.regionId == 'ph' || r.pack.regionId.startsWith('ph-')).toList();
+    final vn = _regions.values.where((r) => r.pack.regionId == 'vn' || r.pack.regionId.startsWith('vn-')).toList();
+    final mm = _regions.values.where((r) => r.pack.regionId == 'mm' || r.pack.regionId.startsWith('mm-')).toList();
+    final la = _regions.values.where((r) => r.pack.regionId == 'la' || r.pack.regionId.startsWith('la-')).toList();
+    final kh = _regions.values.where((r) => r.pack.regionId == 'kh' || r.pack.regionId.startsWith('kh-')).toList();
+    final tl = _regions.values.where((r) => r.pack.regionId == 'tl' || r.pack.regionId.startsWith('tl-')).toList();
 
-    return <CountryOfflineBundle>[
+    final bundles = <CountryOfflineBundle>[
       CountryOfflineBundle(
         countryCode: 'MY',
         countryName: 'Malaysia',
@@ -179,7 +187,64 @@ class OfflineRegionManager {
         currencyDisplay: 'BND (B\$)',
         regions: bn,
       ),
+      if (id.isNotEmpty)
+        CountryOfflineBundle(
+          countryCode: 'ID',
+          countryName: 'Indonesia',
+          currencyDisplay: 'IDR (Rp)',
+          regions: id,
+        ),
+      if (th.isNotEmpty)
+        CountryOfflineBundle(
+          countryCode: 'TH',
+          countryName: 'Thailand',
+          currencyDisplay: 'THB (฿)',
+          regions: th,
+        ),
+      if (ph.isNotEmpty)
+        CountryOfflineBundle(
+          countryCode: 'PH',
+          countryName: 'Philippines',
+          currencyDisplay: 'PHP (₱)',
+          regions: ph,
+        ),
+      if (vn.isNotEmpty)
+        CountryOfflineBundle(
+          countryCode: 'VN',
+          countryName: 'Vietnam',
+          currencyDisplay: 'VND (₫)',
+          regions: vn,
+        ),
+      if (mm.isNotEmpty)
+        CountryOfflineBundle(
+          countryCode: 'MM',
+          countryName: 'Myanmar',
+          currencyDisplay: 'MMK (Ks)',
+          regions: mm,
+        ),
+      if (la.isNotEmpty)
+        CountryOfflineBundle(
+          countryCode: 'LA',
+          countryName: 'Laos',
+          currencyDisplay: 'LAK (₭)',
+          regions: la,
+        ),
+      if (kh.isNotEmpty)
+        CountryOfflineBundle(
+          countryCode: 'KH',
+          countryName: 'Cambodia',
+          currencyDisplay: 'KHR (៛)',
+          regions: kh,
+        ),
+      if (tl.isNotEmpty)
+        CountryOfflineBundle(
+          countryCode: 'TL',
+          countryName: 'Timor-Leste',
+          currencyDisplay: 'USD (\$)',
+          regions: tl,
+        ),
     ];
+    return bundles;
   }
 
   /// Downloads all regional packs belonging to a full country (MY / SG / BN).

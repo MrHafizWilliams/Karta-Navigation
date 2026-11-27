@@ -242,3 +242,64 @@ class KartaMapSavedPlacePin {
         'lon': coordinate.lon,
       };
 }
+
+/// Curated iconic Southeast Asian landmark, international airport, religious site,
+/// or major rail hub rendered interactively on the 3D map.
+@immutable
+class KartaMapFeaturedPin {
+  const KartaMapFeaturedPin({
+    required this.id,
+    required this.name,
+    required this.shortLabel,
+    required this.kind,
+    required this.countryCode,
+    required this.coordinate,
+    this.iataCode,
+    this.minZoom = 8.5,
+  });
+
+  final String id;
+  final String name;
+  final String shortLabel;
+
+  /// One of: `'historic'`, `'modern'`, `'airport'`, `'mosque'`, `'temple'`,
+  /// `'church'`, `'rail'`.
+  final String kind;
+  final String countryCode;
+  final Coordinate coordinate;
+  final String? iataCode;
+  final double minZoom;
+
+  Map<String, dynamic> toJson() => <String, dynamic>{
+        'id': id,
+        'name': name,
+        'shortLabel': shortLabel,
+        'kind': kind,
+        'countryCode': countryCode,
+        'lat': coordinate.lat,
+        'lon': coordinate.lon,
+        if (iataCode != null) 'iataCode': iataCode,
+        'minZoom': minZoom,
+      };
+}
+
+/// Payload emitted when a user taps a vector-tile train station, airport,
+/// mosque, temple, church, or landmark directly on the OpenMapTiles canvas.
+@immutable
+class KartaVectorFeatureTap {
+  const KartaVectorFeatureTap({
+    required this.name,
+    required this.featureClass,
+    required this.subclass,
+    required this.coordinate,
+    this.religion,
+    this.iata,
+  });
+
+  final String name;
+  final String featureClass;
+  final String subclass;
+  final Coordinate coordinate;
+  final String? religion;
+  final String? iata;
+}

@@ -10,7 +10,7 @@ void main() {
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.resetPhysicalSize);
 
-    await tester.pumpWidget(const ProviderScope(child: KartaApp()));
+    await tester.pumpWidget(const ProviderScope(child: KartaApp(enableIntroAnimation: false)));
     await tester.pump(const Duration(milliseconds: 120));
 
     // Switch to 3D Vehicle & Pin Studio via desktop nav rail
@@ -37,7 +37,7 @@ void main() {
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.resetPhysicalSize);
 
-    await tester.pumpWidget(const ProviderScope(child: KartaApp()));
+    await tester.pumpWidget(const ProviderScope(child: KartaApp(enableIntroAnimation: false)));
     await tester.pump(const Duration(milliseconds: 120));
 
     expect(find.text('Navigate'), findsOneWidget);
@@ -46,19 +46,34 @@ void main() {
     // Compact smartphone layout uses bottom bar, NOT persistent left nav rail
     expect(find.text('KARTA'), findsNothing);
     expect(find.text('SPOTIFY'), findsNothing);
+    // Smartphone explore bar starts minimized so users see the full map immediately
+    expect(find.byKey(const ValueKey<String>('karta-mobile-explore-minimized')), findsOneWidget);
   });
 
-  testWidgets('Tablet medium layout (820x1180) renders persistent left nav rail and floating drawer without Spotify',
+  testWidgets('Tablet medium layout (820x1180) renders left nav rail, Google Maps floating search bar, and expandable Directions drawer',
       (WidgetTester tester) async {
     tester.view.physicalSize = const Size(820, 1180);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.resetPhysicalSize);
 
-    await tester.pumpWidget(const ProviderScope(child: KartaApp()));
+    await tester.pumpWidget(const ProviderScope(child: KartaApp(enableIntroAnimation: false)));
     await tester.pump(const Duration(milliseconds: 120));
 
-    expect(find.text('Karta Navigation'), findsOneWidget);
+    expect(find.byKey(const ValueKey<String>('karta-floating-search-bar')), findsOneWidget);
+    expect(find.byKey(const ValueKey<String>('karta-directions-btn')), findsOneWidget);
+    expect(find.byKey(const ValueKey<String>('karta-header-account-btn')), findsOneWidget);
     expect(find.text('KARTA'), findsOneWidget);
     expect(find.text('SPOTIFY'), findsNothing);
+
+    // Tapping Directions opens the full Start -> Destination drawer
+    await tester.tap(find.byKey(const ValueKey<String>('karta-directions-btn')));
+    await tester.pumpAndSettle();
+    expect(find.text('Karta Navigation'), findsOneWidget);
+    expect(find.byKey(const ValueKey<String>('karta-close-directions-btn')), findsOneWidget);
+
+    // Tapping Close returns cleanly to the Google Maps floating search bar
+    await tester.tap(find.byKey(const ValueKey<String>('karta-close-directions-btn')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey<String>('karta-floating-search-bar')), findsOneWidget);
   });
 }

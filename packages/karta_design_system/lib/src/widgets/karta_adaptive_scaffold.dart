@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import '../i18n/karta_l10n.dart';
 import '../icons/karta_logo_mark.dart';
 import '../tokens/karta_palette.dart';
 import '../tokens/karta_spacing.dart';
@@ -37,7 +38,9 @@ class KartaAdaptiveScaffold extends StatefulWidget {
     required this.navItems,
     required this.selectedNavId,
     required this.onSelectNav,
-    required this.sidePanel,
+    this.sidePanel,
+    this.topSearchOverlay,
+    this.topWelcomeOverlay,
     this.topHudOverlay,
     this.topRightControls,
     this.topRightControlsHorizontal,
@@ -49,6 +52,17 @@ class KartaAdaptiveScaffold extends StatefulWidget {
     this.bottomRightOverlay,
     this.mobileActiveSheetOverlay,
     this.mobileSheetExpanded = false,
+    this.mobileExploreExpanded,
+    this.onToggleMobileExplore,
+    this.mobileExploreCollapsedSubtitle,
+    this.onOpenLanguage,
+    this.languageBadge,
+    this.languageTooltip,
+    this.onOpenProfile,
+    this.isProfileSignedIn = false,
+    this.profileInitials,
+    this.profileTooltip,
+    this.onRequestExit,
     this.companionOverlay,
     this.modalOverlay,
     this.hideSidePanel = false,
@@ -60,7 +74,14 @@ class KartaAdaptiveScaffold extends StatefulWidget {
   final List<KartaNavRailItem> navItems;
   final String selectedNavId;
   final ValueChanged<String> onSelectNav;
-  final Widget sidePanel;
+  final Widget? sidePanel;
+
+  /// Google Maps-style floating top search pill + category chips strip shown
+  /// over the open map on desktop/tablet/automotive explore mode.
+  final Widget? topSearchOverlay;
+
+  /// Animated border-crossing welcome toast with state/district flag.
+  final Widget? topWelcomeOverlay;
   final Widget? topHudOverlay;
   final Widget? topRightControls;
 
@@ -77,6 +98,28 @@ class KartaAdaptiveScaffold extends StatefulWidget {
   final Widget? bottomRightOverlay;
   final Widget? mobileActiveSheetOverlay;
   final bool mobileSheetExpanded;
+
+  /// Controls whether the compact smartphone explore sheet is expanded or
+  /// minimized into a sleek compact search pill so drivers see the full map.
+  /// Defaults to minimized (`false`) on smartphones.
+  final bool? mobileExploreExpanded;
+  final VoidCallback? onToggleMobileExplore;
+  final String? mobileExploreCollapsedSubtitle;
+
+  /// 11-language SEA switcher button rendered in the left rail & mobile explore bar.
+  final VoidCallback? onOpenLanguage;
+  final String? languageBadge;
+  final String? languageTooltip;
+
+  /// Profile icon rendered in the left navigation rail footer directly above Exit.
+  final VoidCallback? onOpenProfile;
+  final bool isProfileSignedIn;
+  final String? profileInitials;
+  final String? profileTooltip;
+
+  /// Optional Waze-style exit callback exposed in the navigation rail footer.
+  final VoidCallback? onRequestExit;
+
   final Widget? companionOverlay;
   final Widget? modalOverlay;
   final bool hideSidePanel;
@@ -89,9 +132,13 @@ class KartaAdaptiveScaffold extends StatefulWidget {
 
 class _KartaAdaptiveScaffoldState extends State<KartaAdaptiveScaffold> {
   bool _internalCollapsed = false;
+  bool _internalMobileExploreExpanded = false;
 
   bool get _isCollapsed =>
       widget.onToggleSidebar != null ? widget.sidebarCollapsed : _internalCollapsed;
+
+  bool get _isMobileExploreExpanded =>
+      widget.mobileExploreExpanded ?? _internalMobileExploreExpanded;
 
   void _toggleSidebar() {
     if (widget.onToggleSidebar != null) {
@@ -99,6 +146,19 @@ class _KartaAdaptiveScaffoldState extends State<KartaAdaptiveScaffold> {
     } else {
       setState(() => _internalCollapsed = !_internalCollapsed);
     }
+  }
+
+  void _toggleMobileExplore() {
+    if (widget.onToggleMobileExplore != null) {
+      widget.onToggleMobileExplore!();
+    } else {
+      setState(() => _internalMobileExploreExpanded = !_internalMobileExploreExpanded);
+    }
+  }
+
+  void _setMobileExploreExpanded(bool expanded) {
+    if (_isMobileExploreExpanded == expanded) return;
+    _toggleMobileExplore();
   }
 
   @override
@@ -122,7 +182,8 @@ class _KartaAdaptiveScaffoldState extends State<KartaAdaptiveScaffold> {
         );
         final double panelWidth =
             isExpanded ? KartaSpacing.sidePanelWidth : maxMediumPanel;
-        final bool panelVisible = !widget.hideSidePanel && !_isCollapsed;
+        final bool panelVisible =
+            widget.sidePanel != null && !widget.hideSidePanel && !_isCollapsed;
 
         // Both Medium (Tablet / Standard Auto) and Expanded (Desktop / Wide Auto)
         // share the persistent left navigation rail (`KartaSpacing.railWidth`).
@@ -132,7 +193,9 @@ class _KartaAdaptiveScaffoldState extends State<KartaAdaptiveScaffold> {
             : KartaSpacing.railWidth +
                 (panelVisible
                     ? panelWidth + KartaSpacing.xl + 36
-                    : (widget.hideSidePanel ? KartaSpacing.md : KartaSpacing.md + 54));
+                    : (widget.hideSidePanel || widget.sidePanel == null
+                        ? KartaSpacing.md
+                        : KartaSpacing.md + 54));
 
         // On mobile explore, if a bottom overlay (e.g. Fuel Comparison) is open,
         // it replaces the explore side panel cleanly instead of overlapping it.
@@ -143,6 +206,7 @@ class _KartaAdaptiveScaffoldState extends State<KartaAdaptiveScaffold> {
 
         final bool compactExplorePanelVisible =
             isCompact &&
+            widget.sidePanel != null &&
             !widget.hideSidePanel &&
             widget.mobileActiveSheetOverlay == null &&
             !compactShowsBottomCenter;
@@ -196,12 +260,48 @@ class _KartaAdaptiveScaffoldState extends State<KartaAdaptiveScaffold> {
                         widget.onSelectNav(id);
                         if (_isCollapsed) _toggleSidebar();
                       },
+                      onOpenLanguage: widget.onOpenLanguage,
+                      languageBadge: widget.languageBadge,
+                      languageTooltip: widget.languageTooltip,
+                      onOpenProfile: widget.onOpenProfile,
+                      isProfileSignedIn: widget.isProfileSignedIn,
+                      profileInitials: widget.profileInitials,
+                      profileTooltip: widget.profileTooltip,
+                      onRequestExit: widget.onRequestExit,
                     ),
                   ),
                 ),
 
+              // 2b. Google Maps-style Floating Search Pill + Category Chips (Desktop/Tablet/Auto Explore)
+              if (!isCompact && widget.topSearchOverlay != null)
+                Positioned(
+                  left: KartaSpacing.railWidth + KartaSpacing.md,
+                  right: widget.topRightControls != null ? 84.0 : KartaSpacing.md,
+                  top: safe.top + KartaSpacing.md,
+                  child: widget.topSearchOverlay!,
+                ),
+
+              // 2c. State / District Border-Crossing Welcome Notification Banner with Flag
+              if (widget.topWelcomeOverlay != null)
+                AnimatedPositioned(
+                  duration: const Duration(milliseconds: 280),
+                  curve: Curves.easeOutCubic,
+                  left: isCompact ? KartaSpacing.sm : leftInset,
+                  right: isCompact ? KartaSpacing.sm : topHudRightInset,
+                  top: safe.top +
+                      (isCompact
+                          ? (widget.topHudOverlay != null ? 156.0 : 14.0)
+                          : (widget.topHudOverlay != null
+                              ? 148.0
+                              : (widget.topSearchOverlay != null ? 74.0 : 18.0))),
+                  child: Align(
+                    alignment: Alignment.topCenter,
+                    child: widget.topWelcomeOverlay!,
+                  ),
+                ),
+
               // 3. Collapsible Glassmorphic Side Panel (Medium & Expanded)
-              if (!widget.hideSidePanel && !isCompact)
+              if (widget.sidePanel != null && !widget.hideSidePanel && !isCompact)
                 AnimatedPositioned(
                   duration: const Duration(milliseconds: 280),
                   curve: Curves.easeOutCubic,
@@ -216,14 +316,14 @@ class _KartaAdaptiveScaffoldState extends State<KartaAdaptiveScaffold> {
                       opacity: _isCollapsed ? 0.0 : 1.0,
                       child: KartaPointerShield(
                         intercepting: !_isCollapsed,
-                        child: widget.sidePanel,
+                        child: widget.sidePanel!,
                       ),
                     ),
                   ),
                 ),
 
               // 3b. Floating Glassmorphic Sidebar Collapse / Expand Handle (48x48dp target)
-              if (!widget.hideSidePanel && !isCompact)
+              if (widget.sidePanel != null && !widget.hideSidePanel && !isCompact)
                 AnimatedPositioned(
                   duration: const Duration(milliseconds: 280),
                   curve: Curves.easeOutCubic,
@@ -460,15 +560,89 @@ class _KartaAdaptiveScaffoldState extends State<KartaAdaptiveScaffold> {
                   ),
                 ),
 
-              // 9b. Compact Smartphone layout: floating explore panel + compact bottom tab bar
+              // 9b. Compact Smartphone layout: minimized-by-default collapsible explore sheet + bottom tab bar
               if (compactExplorePanelVisible)
                 Positioned(
                   left: KartaSpacing.sm,
                   right: KartaSpacing.sm,
                   bottom: safe.bottom + 66,
-                  child: ConstrainedBox(
-                    constraints: BoxConstraints(maxHeight: compactExploreMaxHeight),
-                    child: KartaPointerShield(child: widget.sidePanel),
+                  child: KartaPointerShield(
+                    child: GestureDetector(
+                      onVerticalDragEnd: (details) {
+                        final vy = details.primaryVelocity ?? 0;
+                        if (vy < -180) {
+                          _setMobileExploreExpanded(true);
+                        } else if (vy > 180) {
+                          _setMobileExploreExpanded(false);
+                        }
+                      },
+                      child: AnimatedSize(
+                        duration: const Duration(milliseconds: 260),
+                        curve: Curves.easeOutCubic,
+                        alignment: Alignment.bottomCenter,
+                        child: _isMobileExploreExpanded
+                            ? ConstrainedBox(
+                                key: const ValueKey<String>('karta-mobile-explore-expanded'),
+                                constraints: BoxConstraints(maxHeight: compactExploreMaxHeight + 28),
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: <Widget>[
+                                    // Compact drag / minimize header strip above expanded sheet
+                                    GestureDetector(
+                                      behavior: HitTestBehavior.opaque,
+                                      onTap: _toggleMobileExplore,
+                                      child: Container(
+                                        margin: const EdgeInsets.only(bottom: 4),
+                                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
+                                        decoration: BoxDecoration(
+                                          color: palette.hudDeepGlass,
+                                          borderRadius: BorderRadius.circular(999),
+                                          border: Border.all(color: palette.borderStrong),
+                                        ),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: <Widget>[
+                                            Container(
+                                              width: 28,
+                                              height: 3.5,
+                                              decoration: BoxDecoration(
+                                                color: palette.textSecondary.withValues(alpha: 0.6),
+                                                borderRadius: BorderRadius.circular(999),
+                                              ),
+                                            ),
+                                            const SizedBox(width: 8),
+                                            Text(
+                                              context.kartaStrings.minimize,
+                                              style: KartaTypography.captionLabel.copyWith(
+                                                fontSize: 11,
+                                                color: palette.textSecondary,
+                                              ),
+                                            ),
+                                            const SizedBox(width: 2),
+                                            Icon(
+                                              Icons.keyboard_arrow_down_rounded,
+                                              key: const ValueKey<String>('karta-mobile-explore-toggle'),
+                                              size: 16,
+                                              color: palette.accentBright,
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                    Flexible(child: widget.sidePanel!),
+                                  ],
+                                ),
+                              )
+                            : _CompactMinimizedExploreBar(
+                                key: const ValueKey<String>('karta-mobile-explore-minimized'),
+                                subtitle: widget.mobileExploreCollapsedSubtitle ??
+                                    context.kartaStrings.whereToPrompt,
+                                onExpand: () => _setMobileExploreExpanded(true),
+                                onOpenLanguage: widget.onOpenLanguage,
+                                languageBadge: widget.languageBadge,
+                              ),
+                      ),
+                    ),
                   ),
                 ),
 
@@ -481,7 +655,14 @@ class _KartaAdaptiveScaffoldState extends State<KartaAdaptiveScaffold> {
                     child: _CompactBottomNav(
                       items: widget.navItems,
                       selectedId: widget.selectedNavId,
-                      onSelect: widget.onSelectNav,
+                      onSelect: (id) {
+                        if (id == widget.selectedNavId) {
+                          _toggleMobileExplore();
+                        } else {
+                          widget.onSelectNav(id);
+                          _setMobileExploreExpanded(true);
+                        }
+                      },
                       safeBottom: safe.bottom,
                     ),
                   ),
@@ -509,15 +690,33 @@ class _DesktopNavRail extends StatelessWidget {
     required this.items,
     required this.selectedId,
     required this.onSelect,
+    this.onOpenLanguage,
+    this.languageBadge,
+    this.languageTooltip,
+    this.onOpenProfile,
+    this.isProfileSignedIn = false,
+    this.profileInitials,
+    this.profileTooltip,
+    this.onRequestExit,
   });
 
   final List<KartaNavRailItem> items;
   final String selectedId;
   final ValueChanged<String> onSelect;
+  final VoidCallback? onOpenLanguage;
+  final String? languageBadge;
+  final String? languageTooltip;
+  final VoidCallback? onOpenProfile;
+  final bool isProfileSignedIn;
+  final String? profileInitials;
+  final String? profileTooltip;
+  final VoidCallback? onRequestExit;
 
   @override
   Widget build(BuildContext context) {
     final palette = context.kartaPalette;
+    final l10n = context.kartaStrings;
+    final onPrimary = Theme.of(context).colorScheme.onPrimary;
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 220),
@@ -526,35 +725,370 @@ class _DesktopNavRail extends StatelessWidget {
         border: Border(right: BorderSide(color: palette.borderSubtle)),
       ),
       child: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.only(bottom: 12),
-          child: Column(
-            children: <Widget>[
-              const SizedBox(height: 12),
-              const KartaLogoMark(size: 38),
-              const SizedBox(height: 6),
-              Text(
-                'KARTA',
-                style: KartaTypography.monoBadge.copyWith(
-                  fontSize: 11,
-                  letterSpacing: 1.2,
-                  color: palette.accentBright,
+        child: Column(
+          children: <Widget>[
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: Column(
+                  children: <Widget>[
+                    const SizedBox(height: 12),
+                    const KartaLogoMark(size: 38),
+                    const SizedBox(height: 6),
+                    Text(
+                      'KARTA',
+                      style: KartaTypography.monoBadge.copyWith(
+                        fontSize: 11,
+                        letterSpacing: 1.2,
+                        color: palette.accentBright,
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    Divider(height: 1, indent: 14, endIndent: 14, color: palette.borderSubtle),
+                    const SizedBox(height: 10),
+                    for (final item in items)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 3, horizontal: 8),
+                        child: _RailTile(
+                          item: item,
+                          selected: item.id == selectedId,
+                          onTap: () => onSelect(item.id),
+                        ),
+                      ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 14),
+            ),
+            if (onOpenLanguage != null || onOpenProfile != null || onRequestExit != null)
               Divider(height: 1, indent: 14, endIndent: 14, color: palette.borderSubtle),
-              const SizedBox(height: 10),
-              for (final item in items)
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 3, horizontal: 8),
-                  child: _RailTile(
-                    item: item,
-                    selected: item.id == selectedId,
-                    onTap: () => onSelect(item.id),
+            if (onOpenLanguage != null)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(8, 6, 8, 2),
+                child: Tooltip(
+                  message: languageTooltip ?? l10n.selectLanguageTitle,
+                  preferBelow: false,
+                  child: InkWell(
+                    key: const ValueKey<String>('karta-language-btn'),
+                    onTap: onOpenLanguage,
+                    borderRadius: BorderRadius.circular(12),
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(
+                        minWidth: 54,
+                        minHeight: 42,
+                      ),
+                      child: SizedBox(
+                        width: 68,
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: <Widget>[
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 3.5),
+                              decoration: BoxDecoration(
+                                color: palette.accentGlow,
+                                borderRadius: BorderRadius.circular(999),
+                                border: Border.all(
+                                  color: palette.accentPrimary.withValues(alpha: 0.55),
+                                ),
+                              ),
+                              child: FittedBox(
+                                fit: BoxFit.scaleDown,
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: <Widget>[
+                                    Icon(
+                                      Icons.translate_rounded,
+                                      size: 12.5,
+                                      color: palette.accentBright,
+                                    ),
+                                    const SizedBox(width: 2.5),
+                                    Text(
+                                      languageBadge ?? 'EN',
+                                      style: KartaTypography.monoBadge.copyWith(
+                                        fontSize: 9.5,
+                                        fontWeight: FontWeight.w800,
+                                        color: palette.textPrimary,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              l10n.navLanguage,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: KartaTypography.captionLabel.copyWith(
+                                fontSize: 10,
+                                color: palette.textSecondary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
                   ),
                 ),
-            ],
-          ),
+              ),
+            if (onOpenProfile != null)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(8, 4, 8, 2),
+                child: Tooltip(
+                  message: profileTooltip ?? l10n.accountTitle,
+                  preferBelow: false,
+                  child: InkWell(
+                    key: const ValueKey<String>('karta-header-account-btn'),
+                    onTap: onOpenProfile,
+                    borderRadius: BorderRadius.circular(12),
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(
+                        minWidth: 54,
+                        minHeight: KartaSpacing.minTouchTarget,
+                      ),
+                      child: SizedBox(
+                        width: 68,
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: <Widget>[
+                            Container(
+                              width: 34,
+                              height: 34,
+                              alignment: Alignment.center,
+                              decoration: BoxDecoration(
+                                color: isProfileSignedIn
+                                    ? palette.accentPrimary
+                                    : palette.surfaceElevated,
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: isProfileSignedIn
+                                      ? palette.accentBright
+                                      : palette.borderStrong,
+                                  width: 1.4,
+                                ),
+                              ),
+                              child: isProfileSignedIn &&
+                                      profileInitials != null &&
+                                      profileInitials!.isNotEmpty
+                                  ? Text(
+                                      profileInitials!,
+                                      style: KartaTypography.captionLabel.copyWith(
+                                        color: onPrimary,
+                                        fontWeight: FontWeight.w800,
+                                      ),
+                                    )
+                                  : Icon(
+                                      Icons.person_outline_rounded,
+                                      size: 19,
+                                      color: palette.textPrimary,
+                                    ),
+                            ),
+                            const SizedBox(height: 3),
+                            Text(
+                              l10n.navProfile,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: KartaTypography.captionLabel.copyWith(
+                                fontSize: 10.5,
+                                color: palette.textSecondary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            if (onRequestExit != null)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(8, 2, 8, 8),
+                child: Tooltip(
+                  message: l10n.exitDialogTitle,
+                  preferBelow: false,
+                  child: InkWell(
+                    key: const ValueKey<String>('karta-rail-exit-btn'),
+                    onTap: onRequestExit,
+                    borderRadius: BorderRadius.circular(12),
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(
+                        minWidth: 54,
+                        minHeight: KartaSpacing.minTouchTarget,
+                      ),
+                      child: SizedBox(
+                        width: 68,
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: <Widget>[
+                            Icon(
+                              Icons.power_settings_new_rounded,
+                              size: 20,
+                              color: palette.statusAlert,
+                            ),
+                            const SizedBox(height: 3),
+                            Text(
+                              l10n.navExit,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: KartaTypography.captionLabel.copyWith(
+                                fontSize: 10.5,
+                                color: palette.textSecondary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Sleek minimized smartphone explore dock (~72dp tall) that keeps ~80%+ of
+/// the phone screen open for the full 3D map until the user taps or swipes up.
+class _CompactMinimizedExploreBar extends StatelessWidget {
+  const _CompactMinimizedExploreBar({
+    super.key,
+    required this.subtitle,
+    required this.onExpand,
+    this.onOpenLanguage,
+    this.languageBadge,
+  });
+
+  final String subtitle;
+  final VoidCallback onExpand;
+  final VoidCallback? onOpenLanguage;
+  final String? languageBadge;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.kartaPalette;
+    final l10n = context.kartaStrings;
+    return KartaSurfaceCard(
+      padding: const EdgeInsets.fromLTRB(12, 7, 10, 10),
+      borderRadius: 18,
+      deepGlass: true,
+      child: InkWell(
+        onTap: onExpand,
+        borderRadius: BorderRadius.circular(14),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            Container(
+              width: 34,
+              height: 3.5,
+              margin: const EdgeInsets.only(bottom: 7),
+              decoration: BoxDecoration(
+                color: palette.textSecondary.withValues(alpha: 0.48),
+                borderRadius: BorderRadius.circular(999),
+              ),
+            ),
+            Row(
+              children: <Widget>[
+                const KartaLogoMark(size: 30),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: <Widget>[
+                      Text(
+                        l10n.appTitle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: KartaTypography.sectionTitle.copyWith(
+                          fontSize: 14,
+                          color: palette.textPrimary,
+                        ),
+                      ),
+                      Text(
+                        subtitle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: KartaTypography.bodySecondary.copyWith(
+                          fontSize: 11.5,
+                          color: palette.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (onOpenLanguage != null) ...<Widget>[
+                  const SizedBox(width: 6),
+                  InkWell(
+                    key: const ValueKey<String>('karta-language-btn'),
+                    onTap: onOpenLanguage,
+                    borderRadius: BorderRadius.circular(999),
+                    child: Container(
+                      height: 36,
+                      padding: const EdgeInsets.symmetric(horizontal: 9),
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: palette.surfaceElevated,
+                        borderRadius: BorderRadius.circular(999),
+                        border: Border.all(color: palette.borderStrong),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: <Widget>[
+                          Icon(
+                            Icons.translate_rounded,
+                            size: 14,
+                            color: palette.accentBright,
+                          ),
+                          const SizedBox(width: 3),
+                          Text(
+                            languageBadge ?? 'EN',
+                            style: KartaTypography.monoBadge.copyWith(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w800,
+                              color: palette.textPrimary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+                const SizedBox(width: 6),
+                Container(
+                  key: const ValueKey<String>('karta-mobile-explore-toggle'),
+                  height: 36,
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  decoration: BoxDecoration(
+                    color: palette.accentGlow,
+                    borderRadius: BorderRadius.circular(999),
+                    border: Border.all(
+                      color: palette.accentPrimary.withValues(alpha: 0.55),
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: <Widget>[
+                      Icon(
+                        Icons.search_rounded,
+                        size: 16,
+                        color: palette.accentBright,
+                      ),
+                      const SizedBox(width: 4),
+                      Icon(
+                        Icons.keyboard_arrow_up_rounded,
+                        size: 18,
+                        color: palette.accentBright,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ],
         ),
       ),
     );

@@ -50,7 +50,7 @@ BEGIN;
 INSERT INTO geo.osm_admin_boundaries (osm_id, iso_a2, name, admin_level, geom)
 SELECT osm_id, iso_a2, name, admin_level, ST_Multi(ST_CollectionExtract(ST_MakeValid(geom), 3))
 FROM osm_stage.osm_admin_boundaries
-WHERE iso_a2 IN ('MY', 'SG', 'BN')
+WHERE iso_a2 IN ('MY', 'SG', 'BN', 'ID', 'PH', 'TH', 'LA', 'KH', 'VN', 'TL', 'MM')
 ON CONFLICT (osm_id) DO UPDATE SET
     iso_a2 = EXCLUDED.iso_a2,
     name = EXCLUDED.name,
@@ -61,7 +61,7 @@ SET geom = sub.merged_geom
 FROM (
     SELECT iso_a2, ST_Multi(ST_Union(geom)) AS merged_geom
     FROM geo.osm_admin_boundaries
-    WHERE iso_a2 IN ('MY', 'SG', 'BN')
+    WHERE iso_a2 IN ('MY', 'SG', 'BN', 'ID', 'PH', 'TH', 'LA', 'KH', 'VN', 'TL', 'MM')
     GROUP BY iso_a2
 ) sub
 WHERE c.iso_a2 = sub.iso_a2

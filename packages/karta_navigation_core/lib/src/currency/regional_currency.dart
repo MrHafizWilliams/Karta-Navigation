@@ -9,12 +9,28 @@ abstract final class RegionalCurrencyFormatter {
     'MY': (code: 'MYR', symbol: 'RM', space: true),
     'SG': (code: 'SGD', symbol: '\$', space: false),
     'BN': (code: 'BND', symbol: 'B\$', space: false),
+    'ID': (code: 'IDR', symbol: 'Rp', space: true),
+    'TH': (code: 'THB', symbol: '฿', space: false),
+    'PH': (code: 'PHP', symbol: '₱', space: false),
+    'VN': (code: 'VND', symbol: '₫', space: false),
+    'MM': (code: 'MMK', symbol: 'Ks', space: true),
+    'LA': (code: 'LAK', symbol: '₭', space: false),
+    'KH': (code: 'KHR', symbol: '៛', space: false),
+    'TL': (code: 'USD', symbol: '\$', space: false),
   };
 
   static const Map<String, ({String symbol, bool space})> _byCurrency = {
     'MYR': (symbol: 'RM', space: true),
     'SGD': (symbol: '\$', space: false),
     'BND': (symbol: 'B\$', space: false),
+    'IDR': (symbol: 'Rp', space: true),
+    'THB': (symbol: '฿', space: false),
+    'PHP': (symbol: '₱', space: false),
+    'VND': (symbol: '₫', space: false),
+    'MMK': (symbol: 'Ks', space: true),
+    'LAK': (symbol: '₭', space: false),
+    'KHR': (symbol: '៛', space: false),
+    'USD': (symbol: '\$', space: false),
   };
 
   static String currencyCodeForCountry(String isoA2) {

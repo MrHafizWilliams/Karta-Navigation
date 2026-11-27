@@ -1,7 +1,8 @@
 # Karta Navigation Platform — Git Ignore
 
 # Generated & downloaded geospatial/routing artifacts (never commit)
-data/
+/data/
+/maps/
 *.osm.pbf
 *.osm.pbf.md5
 *.pmtiles

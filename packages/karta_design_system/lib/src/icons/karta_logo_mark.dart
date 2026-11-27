@@ -37,10 +37,21 @@ class KartaLogoMark extends StatelessWidget {
       return _vectorFallback(resolvedAccent, resolvedCore, resolvedChevron);
     }
 
-    return SizedBox(
+    final radius = BorderRadius.circular(size * 0.24);
+    return Container(
       width: size,
       height: size,
-      child: ClipOval(
+      decoration: BoxDecoration(
+        borderRadius: radius,
+        border: palette.isDaylight
+            ? null
+            : Border.all(
+                color: Colors.white.withValues(alpha: 0.28),
+                width: 1.0,
+              ),
+      ),
+      child: ClipRRect(
+        borderRadius: radius,
         child: Image.asset(
           assetPath,
           package: packageName,

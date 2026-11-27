@@ -6,12 +6,15 @@ import 'package:karta_map_engine/karta_map_engine.dart';
 import 'package:karta_navigation_core/karta_navigation_core.dart';
 import 'package:karta_offline_routing/karta_offline_routing.dart';
 
+import '../data/sea_featured_places.dart';
 import '../services/live_location_platform.dart';
 import '../services/live_location_stub.dart'
     if (dart.library.js_interop) '../services/live_location_web.dart' as live_loc_factory;
+import 'language_providers.dart';
 import 'lighting_providers.dart';
 import 'phase3_providers.dart';
 import 'phase4_automotive_providers.dart';
+import 'region_welcome_providers.dart';
 
 /// Named location used as Start (Origin) or End (Destination) in Karta's
 /// single-destination navigation planner.
@@ -90,6 +93,70 @@ abstract final class KartaRegionalAnchors {
     subtitle: 'Brunei-Muara · Brunei Darussalam',
     countryCode: 'BN',
     coordinate: Coordinate(lat: 4.8895, lon: 114.9392),
+  );
+
+  static const NamedWaypoint jakartaMonas = NamedWaypoint(
+    id: 'anchor-id-jkt',
+    label: 'Monas (National Monument), Jakarta',
+    subtitle: 'Central Jakarta · Indonesia',
+    countryCode: 'ID',
+    coordinate: Coordinate(lat: -6.1754, lon: 106.8272),
+  );
+
+  static const NamedWaypoint bangkokSiam = NamedWaypoint(
+    id: 'anchor-th-bkk',
+    label: 'Siam Square, Bangkok',
+    subtitle: 'Pathum Wan · Thailand',
+    countryCode: 'TH',
+    coordinate: Coordinate(lat: 13.7456, lon: 100.5341),
+  );
+
+  static const NamedWaypoint manilaRizal = NamedWaypoint(
+    id: 'anchor-ph-mnl',
+    label: 'Rizal Park / Intramuros, Manila',
+    subtitle: 'Metro Manila · Philippines',
+    countryCode: 'PH',
+    coordinate: Coordinate(lat: 14.5831, lon: 120.9794),
+  );
+
+  static const NamedWaypoint hoChiMinhBenThanh = NamedWaypoint(
+    id: 'anchor-vn-hcmc',
+    label: 'Ben Thanh Market, Ho Chi Minh City',
+    subtitle: 'District 1 · Vietnam',
+    countryCode: 'VN',
+    coordinate: Coordinate(lat: 10.7725, lon: 106.6980),
+  );
+
+  static const NamedWaypoint yangonShwedagon = NamedWaypoint(
+    id: 'anchor-mm-ygn',
+    label: 'Shwedagon Pagoda, Yangon',
+    subtitle: 'Dagon Township · Myanmar',
+    countryCode: 'MM',
+    coordinate: Coordinate(lat: 16.7983, lon: 96.1496),
+  );
+
+  static const NamedWaypoint vientianePatuxai = NamedWaypoint(
+    id: 'anchor-la-vte',
+    label: 'Patuxai Victory Monument, Vientiane',
+    subtitle: 'Vientiane Capital · Laos',
+    countryCode: 'LA',
+    coordinate: Coordinate(lat: 17.9706, lon: 102.6186),
+  );
+
+  static const NamedWaypoint phnomPenhRoyalPalace = NamedWaypoint(
+    id: 'anchor-kh-pnh',
+    label: 'Royal Palace, Phnom Penh',
+    subtitle: 'Daun Penh · Cambodia',
+    countryCode: 'KH',
+    coordinate: Coordinate(lat: 11.5637, lon: 104.9313),
+  );
+
+  static const NamedWaypoint diliCristoRei = NamedWaypoint(
+    id: 'anchor-tl-dil',
+    label: 'Dili Waterfront & Cristo Rei, Dili',
+    subtitle: 'Dili Municipality · Timor-Leste',
+    countryCode: 'TL',
+    coordinate: Coordinate(lat: -8.5569, lon: 125.5603),
   );
 }
 
@@ -262,7 +329,9 @@ final navigationSessionProvider = Provider<NavigationSessionController>((ref) {
 
   int? lastTurnBeginIdx;
   final snapSub = session.stream.listen((snap) {
-    if (snap.phase == NavigationPhase.navigating && snap.currentFix != null) {
+    final isActiveDrive = snap.phase == NavigationPhase.navigating ||
+        snap.phase == NavigationPhase.arrived;
+    if (isActiveDrive && snap.currentFix != null) {
       mapCtrl.followNavigationFix(
         snap.currentFix!,
         distanceToManeuverMeters: snap.distanceToManeuverMeters,
@@ -280,9 +349,17 @@ final navigationSessionProvider = Provider<NavigationSessionController>((ref) {
             coordinate: snap.currentFix!.coordinate,
             isTunnel: snap.roadContext?.isTunnel ?? false,
           );
+      final welcomeState = ref.read(regionWelcomeProvider);
+      final welcomeNotifier = ref.read(regionWelcomeProvider.notifier);
+      if (!welcomeState.isNavigationActive) {
+        welcomeNotifier.beginNavigationSession(snap.currentFix!.coordinate);
+      } else {
+        welcomeNotifier.onNavigationFix(snap.currentFix!.coordinate);
+      }
     } else if (snap.phase == NavigationPhase.idle) {
       lastTurnBeginIdx = null;
       mapCtrl.hideVehiclePuck();
+      ref.read(regionWelcomeProvider.notifier).endNavigationSession();
     }
   });
 
@@ -302,9 +379,12 @@ final navigationSnapshotProvider = StreamProvider<NavigationSnapshot>((ref) {
 final voiceMutedProvider = StateProvider<bool>((ref) => false);
 final activeNavTabProvider = StateProvider<String>((ref) => 'navigate');
 final selectedPoiProvider = StateProvider<PoiItem?>((ref) => null);
+final selectedFeaturedPlaceProvider = StateProvider<KartaFeaturedPlace?>((ref) => null);
 final inspectedMapSpotProvider = StateProvider<InspectedMapSpot?>((ref) => null);
 final lookAroundTargetProvider = StateProvider<StreetLookAroundTarget?>((ref) => null);
 final mobileNavSheetExpandedProvider = StateProvider<bool>((ref) => false);
+final mobileExploreExpandedProvider = StateProvider<bool>((ref) => false);
+final directionsDrawerOpenProvider = StateProvider<bool>((ref) => false);
 final activePlaybackSourceProvider = StateProvider<RoutePlaybackPositionSource?>((ref) => null);
 final activeLiveGpsSourceProvider = StateProvider<LiveGpsPositionSource?>((ref) => null);
 
@@ -386,6 +466,16 @@ class LiveLocationNotifier extends StateNotifier<LiveLocationSnapshot> {
       unawaited(startTracking(centerOnFirstFix: false));
     }
     return true;
+  }
+
+  /// Pauses continuous GPS tracking cleanly (used when user confirms Waze-style exit).
+  void stopTracking() {
+    _watchSub?.cancel();
+    _watchSub = null;
+    _service.stopWatching();
+    if (mounted) {
+      state = state.copyWith(status: LiveLocationStatus.idle);
+    }
   }
 
   void _handleIncomingFix(
@@ -584,6 +674,15 @@ class RoutePlannerNotifier extends StateNotifier<RoutePlannerState> {
     _pushRoutesToMap(resp, index, fit: false);
   }
 
+  void clearRoutes() {
+    state = state.copyWith(
+      clearRouteResponse: true,
+      selectedRouteIndex: 0,
+      errorMessage: null,
+    );
+    _ref.read(kartaMapControllerProvider).clearRoutes();
+  }
+
   Future<void> computeRoute() async {
     state = state.copyWith(isComputing: true, errorMessage: null);
     final api = _ref.read(kartaApiClientProvider);
@@ -602,6 +701,7 @@ class RoutePlannerNotifier extends StateNotifier<RoutePlannerState> {
         alternates: 2,
         includeTollFreeComparison: false,
         departureTime: state.departureTime,
+        language: _ref.read(kartaLanguageProvider).code,
       );
 
       final resp = await api.computeRoute(req);
@@ -674,11 +774,17 @@ class RoutePlannerNotifier extends StateNotifier<RoutePlannerState> {
     }
 
     final session = _ref.read(navigationSessionProvider);
+    final initialCoord = (!simulate && liveLoc.hasLiveFix && liveLoc.fix != null)
+        ? liveLoc.fix!.coordinate
+        : state.origin.coordinate;
     session.startNavigation(
       route: route,
       positionSource: source,
       initialCountry: state.routeResponse?.originCountry,
     );
+    _ref
+        .read(regionWelcomeProvider.notifier)
+        .beginNavigationSession(initialCoord);
     _ref.read(kartaAutomotiveBridgeProvider).updateActiveRoute(
           route: route,
           originName: state.origin.label,
@@ -695,6 +801,7 @@ class RoutePlannerNotifier extends StateNotifier<RoutePlannerState> {
     _ref.read(activeLiveGpsSourceProvider)?.dispose();
     _ref.read(activeLiveGpsSourceProvider.notifier).state = null;
     _ref.read(mobileNavSheetExpandedProvider.notifier).state = false;
+    _ref.read(regionWelcomeProvider.notifier).endNavigationSession();
     _ref.read(navigationSessionProvider).stopNavigation();
     _ref.read(kartaAutomotiveBridgeProvider).updateActiveRoute(
           route: null,

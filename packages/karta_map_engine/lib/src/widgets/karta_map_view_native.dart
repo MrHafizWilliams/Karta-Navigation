@@ -1,8 +1,14 @@
+import 'dart:convert';
+import 'dart:io' show Platform;
 import 'dart:math' as math;
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:karta_api_client/karta_api_client.dart';
 import 'package:karta_design_system/karta_design_system.dart';
 import 'package:karta_navigation_core/karta_navigation_core.dart';
+import 'package:webview_flutter/webview_flutter.dart';
 
 import '../cache/predictive_tile_prefetcher.dart';
 import '../controller/karta_map_controller.dart';
@@ -15,6 +21,20 @@ Widget buildPlatformKartaMapView({
   required double initialZoom,
   required double initialPitch,
 }) {
+  final isFlutterTest = Platform.environment.containsKey('FLUTTER_TEST');
+  final useNativeMobileWebView =
+      !kIsWeb && !isFlutterTest && (Platform.isAndroid || Platform.isIOS);
+
+  if (useNativeMobileWebView) {
+    return _MobileWebViewKartaMap(
+      controller: controller,
+      pmtilesUrl: pmtilesUrl,
+      initialCenter: initialCenter,
+      initialZoom: initialZoom,
+      initialPitch: initialPitch,
+    );
+  }
+
   return _NativeKartaMapSurface(
     controller: controller,
     pmtilesUrl: pmtilesUrl,
@@ -24,10 +44,603 @@ Widget buildPlatformKartaMapView({
   );
 }
 
-/// Native MapLibre PlatformView host & deterministic vector projection canvas
-/// used on non-Web targets (iOS/Android/Windows/macOS/Linux + headless widget tests).
-/// On mobile/desktop production builds, native MapLibre PlatformView binds directly
-/// through [KartaMapPlatformDriver] using the identical [KartaMapStyleBuilder] spec.
+/// Real hardware-accelerated MapLibre GL JS v5 + PMTiles / OpenMapTiles vector
+/// map host for Android and iOS smartphones & tablets.
+///
+/// Shares Karta's exact `karta_map_bridge.js` engine (3D buildings, authentic
+/// 8-country ASEAN road shields, Google Maps-style POI pins, pulsing live GPS
+/// indicator, curved 2D turn arrows, and Day/Night lighting).
+class _MobileWebViewKartaMap extends StatefulWidget {
+  const _MobileWebViewKartaMap({
+    required this.controller,
+    required this.pmtilesUrl,
+    required this.initialCenter,
+    required this.initialZoom,
+    required this.initialPitch,
+  });
+
+  final KartaMapController controller;
+  final String pmtilesUrl;
+  final Coordinate initialCenter;
+  final double initialZoom;
+  final double initialPitch;
+
+  @override
+  State<_MobileWebViewKartaMap> createState() => _MobileWebViewKartaMapState();
+}
+
+class _MobileWebViewKartaMapState extends State<_MobileWebViewKartaMap>
+    implements KartaMapPlatformDriver {
+  static const String _containerId = 'karta-maplibre-native';
+
+  late final WebViewController _webController;
+  final List<String> _pendingJsQueue = <String>[];
+  bool _bridgeReady = false;
+  bool _hostLoaded = false;
+  bool _disposed = false;
+  bool _pausedForProjection = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final isInitialDay =
+        widget.controller.lightingMode == KartaVisualMode.tropicalDaylight;
+
+    _webController = WebViewController()
+      ..setJavaScriptMode(JavaScriptMode.unrestricted)
+      ..setBackgroundColor(
+        isInitialDay ? const Color(0xFFF5F2EB) : const Color(0xFF0D0F12),
+      )
+      ..addJavaScriptChannel(
+        'KartaNativeChannel',
+        onMessageReceived: _onNativeJsMessage,
+      )
+      ..setNavigationDelegate(
+        NavigationDelegate(
+          onPageFinished: (_) {
+            if (!_hostLoaded && !_disposed) {
+              _hostLoaded = true;
+              _initMapBridge();
+            }
+          },
+        ),
+      );
+
+    _loadBundledMapSurface();
+  }
+
+  Future<void> _loadBundledMapSurface() async {
+    try {
+      final htmlTemplate = await rootBundle.loadString(
+        'packages/karta_map_engine/assets/karta_mobile_map.html',
+      );
+      final bridgeJs = await rootBundle.loadString(
+        'packages/karta_map_engine/assets/karta_map_bridge.js',
+      );
+      if (_disposed) return;
+
+      final combinedHtml = htmlTemplate.replaceFirst(
+        '/* __KARTA_MAP_BRIDGE_JS__ */',
+        bridgeJs,
+      );
+      await _webController.loadHtmlString(
+        combinedHtml,
+        baseUrl: 'https://karta.local/',
+      );
+    } catch (e) {
+      debugPrint('[KartaMobileMap] Failed to load bundled map assets: $e');
+    }
+  }
+
+  void _initMapBridge() {
+    final lightingStr =
+        widget.controller.lightingMode == KartaVisualMode.tropicalDaylight
+            ? 'day'
+            : 'dark';
+    final cfg = jsonEncode(<String, dynamic>{
+      'containerId': _containerId,
+      'pmtilesUrl': widget.pmtilesUrl,
+      'lat': widget.initialCenter.lat,
+      'lon': widget.initialCenter.lon,
+      'zoom': widget.initialZoom,
+      'pitch': widget.initialPitch,
+      'lightingMode': lightingStr,
+    });
+    _webController.runJavaScript(
+      'if (window.__kartaNativeInit) { window.__kartaNativeInit($cfg); }',
+    );
+  }
+
+  void _onNativeJsMessage(JavaScriptMessage msg) {
+    if (_disposed || !mounted) return;
+    try {
+      final decoded = jsonDecode(msg.message);
+      if (decoded is! Map<String, dynamic>) return;
+      final type = decoded['type'] as String? ?? '';
+      final payload = (decoded['payload'] as Map?)?.cast<String, dynamic>() ??
+          const <String, dynamic>{};
+
+      switch (type) {
+        case 'hostLoaded':
+          if (!_hostLoaded) {
+            _hostLoaded = true;
+            _initMapBridge();
+          }
+          break;
+        case 'ready':
+          _bridgeReady = true;
+          widget.controller.attachDriver(this);
+          _flushPendingQueue();
+          break;
+        case 'mapTap':
+          final lat = (payload['lat'] as num?)?.toDouble();
+          final lon = (payload['lon'] as num?)?.toDouble();
+          if (lat != null && lon != null) {
+            widget.controller.notifyMapTapped(Coordinate(lat: lat, lon: lon));
+          }
+          break;
+        case 'userDrag':
+          widget.controller.notifyUserDragged();
+          break;
+        case 'fuelPinTap':
+          final poiId = (payload['poiId'] as num?)?.toInt();
+          if (poiId != null) widget.controller.notifyFuelPinTapped(poiId);
+          break;
+        case 'hazardPinTap':
+          final hazardId = payload['hazardId'] as String?;
+          if (hazardId != null) widget.controller.notifyHazardPinTapped(hazardId);
+          break;
+        case 'poiPinTap':
+          final poiId = (payload['poiId'] as num?)?.toInt();
+          if (poiId != null) widget.controller.notifyPoiPinTapped(poiId);
+          break;
+        case 'routeCalloutTap':
+          final idx = (payload['routeIndex'] as num?)?.toInt();
+          if (idx != null) widget.controller.notifyRouteCalloutTapped(idx);
+          break;
+        case 'featuredPlaceTap':
+          final placeId = payload['placeId'] as String?;
+          if (placeId != null && placeId.isNotEmpty) {
+            widget.controller.notifyFeaturedPlaceTapped(placeId);
+          }
+          break;
+        case 'vectorFeatureTap':
+          final featureJson = payload['featureJson'] as String?;
+          if (featureJson != null && featureJson.isNotEmpty) {
+            final decodedFeat = jsonDecode(featureJson);
+            if (decodedFeat is Map<String, dynamic>) {
+              final lat = (decodedFeat['lat'] as num?)?.toDouble();
+              final lon = (decodedFeat['lon'] as num?)?.toDouble();
+              final name = (decodedFeat['name'] as String?)?.trim() ?? '';
+              if (lat != null && lon != null && name.isNotEmpty) {
+                widget.controller.notifyVectorFeatureTapped(
+                  KartaVectorFeatureTap(
+                    name: name,
+                    featureClass: (decodedFeat['featureClass'] as String?) ?? '',
+                    subclass: (decodedFeat['subclass'] as String?) ?? '',
+                    religion: decodedFeat['religion'] as String?,
+                    iata: decodedFeat['iata'] as String?,
+                    coordinate: Coordinate(lat: lat, lon: lon),
+                  ),
+                );
+              }
+            }
+          }
+          break;
+        case 'viewportChanged':
+          final minLon = (payload['minLon'] as num?)?.toDouble();
+          final minLat = (payload['minLat'] as num?)?.toDouble();
+          final maxLon = (payload['maxLon'] as num?)?.toDouble();
+          final maxLat = (payload['maxLat'] as num?)?.toDouble();
+          final zoom = (payload['zoom'] as num?)?.toDouble();
+          if (minLon != null &&
+              minLat != null &&
+              maxLon != null &&
+              maxLat != null &&
+              zoom != null) {
+            widget.controller.notifyViewportChanged(
+              KartaViewportBounds(
+                minLon: minLon,
+                minLat: minLat,
+                maxLon: maxLon,
+                maxLat: maxLat,
+                zoom: zoom,
+              ),
+            );
+          }
+          break;
+      }
+    } catch (e) {
+      debugPrint('[KartaMobileMap] Channel parse warning: $e');
+    }
+  }
+
+  void _callBridge(String jsStatement) {
+    if (_disposed) return;
+    if (!_bridgeReady) {
+      if (_pendingJsQueue.length > 40) {
+        _pendingJsQueue.removeAt(0);
+      }
+      _pendingJsQueue.add(jsStatement);
+      return;
+    }
+    _webController.runJavaScript(jsStatement);
+  }
+
+  void _flushPendingQueue() {
+    if (_pendingJsQueue.isEmpty || _disposed) return;
+    final batch = List<String>.from(_pendingJsQueue);
+    _pendingJsQueue.clear();
+    for (final stmt in batch) {
+      _webController.runJavaScript(stmt);
+    }
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    widget.controller.detachDriver();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_pausedForProjection) {
+      return ColoredBox(
+        color: context.kartaPalette.backgroundPrimary,
+        child: const SizedBox.expand(),
+      );
+    }
+    return WebViewWidget(controller: _webController);
+  }
+
+  String _jsStr(String raw) => jsonEncode(raw);
+
+  @override
+  void easeCamera({
+    required Coordinate center,
+    double? zoom,
+    double? pitch,
+    double? bearing,
+    int durationMs = 600,
+    double paddingTop = 0,
+    double paddingBottom = 0,
+    double paddingLeft = 0,
+  }) {
+    final opts = jsonEncode(<String, dynamic>{
+      'lat': center.lat,
+      'lon': center.lon,
+      if (zoom != null) 'zoom': zoom,
+      if (pitch != null) 'pitch': pitch,
+      if (bearing != null) 'bearing': bearing,
+      'durationMs': durationMs,
+      'padding': <String, double>{
+        'top': paddingTop,
+        'bottom': paddingBottom,
+        'left': paddingLeft,
+        'right': 0,
+      },
+    });
+    _callBridge(
+      'window.KartaMapBridge && window.KartaMapBridge.easeCamera(${_jsStr(_containerId)}, ${_jsStr(opts)});',
+    );
+  }
+
+  @override
+  void fitBounds({
+    required double minLon,
+    required double minLat,
+    required double maxLon,
+    required double maxLat,
+    double paddingLeft = 420,
+    double paddingTop = 80,
+    double paddingRight = 80,
+    double paddingBottom = 100,
+  }) {
+    final opts = jsonEncode(<String, dynamic>{
+      'minLon': minLon,
+      'minLat': minLat,
+      'maxLon': maxLon,
+      'maxLat': maxLat,
+      'padding': <String, double>{
+        'left': paddingLeft,
+        'top': paddingTop,
+        'right': paddingRight,
+        'bottom': paddingBottom,
+      },
+    });
+    _callBridge(
+      'window.KartaMapBridge && window.KartaMapBridge.fitBounds(${_jsStr(_containerId)}, ${_jsStr(opts)});',
+    );
+  }
+
+  @override
+  void setRoutes({
+    required List<List<Coordinate>> routePolylines,
+    required int selectedIndex,
+    int? tollFreeIndex,
+    required List<KartaMapStopPin> stops,
+    List<KartaMapRouteCallout> callouts = const <KartaMapRouteCallout>[],
+    List<KartaMapTurnArrow> turnArrows = const <KartaMapTurnArrow>[],
+  }) {
+    final payload = jsonEncode(<String, dynamic>{
+      'routes': routePolylines
+          .map((line) => line.map((c) => <double>[c.lon, c.lat]).toList())
+          .toList(),
+      'selectedIndex': selectedIndex,
+      'tollFreeIndex': tollFreeIndex,
+      'stops': stops.map((s) => s.toJson()).toList(),
+      'callouts': callouts.map((c) => c.toJson()).toList(),
+      'turnArrows': turnArrows.map((a) => a.toJson()).toList(),
+    });
+    _callBridge(
+      'window.KartaMapBridge && window.KartaMapBridge.setRoutes(${_jsStr(_containerId)}, ${_jsStr(payload)});',
+    );
+  }
+
+  @override
+  void setTurnArrows(List<KartaMapTurnArrow> turnArrows) {
+    final payload = jsonEncode(turnArrows.map((a) => a.toJson()).toList());
+    _callBridge(
+      'window.KartaMapBridge && window.KartaMapBridge.setTurnArrows(${_jsStr(_containerId)}, ${_jsStr(payload)});',
+    );
+  }
+
+  @override
+  void setSavedPlaces(List<KartaMapSavedPlacePin> savedPlaces) {
+    final payload = jsonEncode(savedPlaces.map((p) => p.toJson()).toList());
+    _callBridge(
+      'window.KartaMapBridge && window.KartaMapBridge.setSavedPlaces(${_jsStr(_containerId)}, ${_jsStr(payload)});',
+    );
+  }
+
+  @override
+  void setPois(List<PoiItem> pois) {
+    final payload = jsonEncode(
+      pois
+          .map(
+            (p) => <String, dynamic>{
+              'id': p.id,
+              'name': p.name,
+              'category': p.category,
+              'brand': p.brand,
+              'lat': p.coordinate.lat,
+              'lon': p.coordinate.lon,
+            },
+          )
+          .toList(),
+    );
+    _callBridge(
+      'window.KartaMapBridge && window.KartaMapBridge.setPois(${_jsStr(_containerId)}, ${_jsStr(payload)});',
+    );
+  }
+
+  @override
+  void setTollGantries(List<GantryInfo> gantries) {
+    _callBridge(
+      'window.KartaMapBridge && window.KartaMapBridge.setTollGantries(${_jsStr(_containerId)}, "[]");',
+    );
+  }
+
+  @override
+  void setHazards(List<HazardRecord> hazards) {
+    final payload = jsonEncode(
+      hazards
+          .map(
+            (h) => <String, dynamic>{
+              'id': h.id,
+              'category': h.category.wireValue,
+              'label': h.category.label,
+              'severity': h.severity.wireValue,
+              'severityRank': switch (h.category) {
+                HazardCategory.roadClosure || HazardCategory.accident => 3,
+                HazardCategory.police => 2,
+                _ => 1,
+              },
+              'lat': h.coordinate.lat,
+              'lon': h.coordinate.lon,
+              'confirmations': h.confirmations,
+              'roadRef': h.roadRef,
+              'onRoute': h.onActiveRoute,
+            },
+          )
+          .toList(),
+    );
+    _callBridge(
+      'window.KartaMapBridge && window.KartaMapBridge.setHazards(${_jsStr(_containerId)}, ${_jsStr(payload)});',
+    );
+  }
+
+  @override
+  void setTrafficSegments({
+    required List<Coordinate> routePoints,
+    required List<CongestionSegment> segments,
+  }) {
+    final payload = jsonEncode(<String, dynamic>{
+      'route': routePoints.map((c) => <double>[c.lon, c.lat]).toList(),
+      'segments': segments.map((s) => s.toJson()).toList(),
+    });
+    _callBridge(
+      'window.KartaMapBridge && window.KartaMapBridge.setTrafficSegments(${_jsStr(_containerId)}, ${_jsStr(payload)});',
+    );
+  }
+
+  @override
+  void setFuelPins(List<FuelStationComparison> stations) {
+    int? cheapestMinor;
+    for (final s in stations) {
+      if (cheapestMinor == null || s.selectedPriceMinor < cheapestMinor) {
+        cheapestMinor = s.selectedPriceMinor;
+      }
+    }
+    final payload = jsonEncode(
+      stations.map((s) {
+        final deltaMinor =
+            cheapestMinor != null ? (s.selectedPriceMinor - cheapestMinor) : 0;
+        String? deltaFormatted;
+        if (!s.isCheapest && deltaMinor > 0) {
+          deltaFormatted = '+${(deltaMinor / 100.0).toStringAsFixed(2)}';
+        }
+        return <String, dynamic>{
+          'id': s.poiId,
+          'name': s.name,
+          'brand': s.brand ?? s.name,
+          'price': s.selectedFormattedPrice,
+          'priceMinor': s.selectedPriceMinor,
+          'deltaFormatted': deltaFormatted,
+          'grade': s.selectedGrade.shortLabel,
+          'cheapest': s.isCheapest,
+          'detourMeters': s.detourMeters,
+          'distanceAlongRouteKm': s.distanceAlongRouteKm,
+          'lat': s.coordinate.lat,
+          'lon': s.coordinate.lon,
+        };
+      }).toList(),
+    );
+    _callBridge(
+      'window.KartaMapBridge && window.KartaMapBridge.setFuelPins(${_jsStr(_containerId)}, ${_jsStr(payload)});',
+    );
+  }
+
+  @override
+  void setCarpoolOverlay(CarpoolMapOverlay? overlay) {
+    final payload = jsonEncode(overlay?.toJson());
+    _callBridge(
+      'window.KartaMapBridge && window.KartaMapBridge.setCarpoolOverlay(${_jsStr(_containerId)}, ${_jsStr(payload)});',
+    );
+  }
+
+  @override
+  void setUserLocation({
+    required Coordinate? coordinate,
+    double? headingDeg,
+    double accuracyMeters = 15.0,
+    bool visible = true,
+  }) {
+    final lat = coordinate?.lat ?? 0.0;
+    final lon = coordinate?.lon ?? 0.0;
+    final hdg = headingDeg ?? -1.0;
+    final vis = visible && coordinate != null;
+    _callBridge(
+      'window.KartaMapBridge && window.KartaMapBridge.setUserLocation(${_jsStr(_containerId)}, $lat, $lon, $hdg, $accuracyMeters, $vis);',
+    );
+  }
+
+  @override
+  void setDroppedPin({
+    required Coordinate? coordinate,
+    String? label,
+  }) {
+    final lat = coordinate?.lat ?? 0.0;
+    final lon = coordinate?.lon ?? 0.0;
+    final vis = coordinate != null;
+    _callBridge(
+      'window.KartaMapBridge && window.KartaMapBridge.setDroppedPin(${_jsStr(_containerId)}, $lat, $lon, ${_jsStr(label ?? '')}, $vis);',
+    );
+  }
+
+  @override
+  void setVehiclePose({
+    required Coordinate coordinate,
+    required double bearingDeg,
+    required double speedKmh,
+    required bool visible,
+  }) {
+    _callBridge(
+      'window.KartaMapBridge && window.KartaMapBridge.setVehiclePose(${_jsStr(_containerId)}, ${coordinate.lat}, ${coordinate.lon}, $bearingDeg, $speedKmh, $visible);',
+    );
+  }
+
+  @override
+  void setVehicleCustomization(KartaVehicleCustomization customization) {
+    final payload = jsonEncode(customization.toJson());
+    _callBridge(
+      'window.KartaMapBridge && window.KartaMapBridge.setVehicleCustomization(${_jsStr(_containerId)}, ${_jsStr(payload)});',
+    );
+  }
+
+  @override
+  void set3DBuildingsEnabled(bool enabled) {
+    _callBridge(
+      'window.KartaMapBridge && window.KartaMapBridge.set3DBuildings(${_jsStr(_containerId)}, $enabled);',
+    );
+  }
+
+  @override
+  void setPmtilesUrl(String url) {
+    _callBridge(
+      'window.KartaMapBridge && window.KartaMapBridge.setPmtilesUrl(${_jsStr(_containerId)}, ${_jsStr(url)});',
+    );
+  }
+
+  @override
+  void setLightingMode(KartaVisualMode mode) {
+    final m = mode == KartaVisualMode.tropicalDaylight ? 'day' : 'dark';
+    _callBridge(
+      'window.KartaMapBridge && window.KartaMapBridge.setLightingMode(${_jsStr(_containerId)}, ${_jsStr(m)});',
+    );
+  }
+
+  @override
+  void setDrivingSpeed({
+    required double speedKmh,
+    required bool declutterMinorLabels,
+  }) {
+    _callBridge(
+      'window.KartaMapBridge && window.KartaMapBridge.setDrivingSpeed(${_jsStr(_containerId)}, $speedKmh, $declutterMinorLabels);',
+    );
+  }
+
+  @override
+  void setLookAroundOrbit({
+    required Coordinate center,
+    required double bearingDeg,
+    required bool active,
+  }) {
+    _callBridge(
+      'window.KartaMapBridge && window.KartaMapBridge.setLookAroundOrbit(${_jsStr(_containerId)}, ${center.lat}, ${center.lon}, $bearingDeg, $active);',
+    );
+  }
+
+  @override
+  void setThermalRenderProfile({
+    required int targetFps,
+    required bool enable3DBuildings,
+    required bool pausedForProjection,
+  }) {
+    if (_pausedForProjection != pausedForProjection && mounted) {
+      setState(() => _pausedForProjection = pausedForProjection);
+    }
+    set3DBuildingsEnabled(enable3DBuildings && !pausedForProjection);
+  }
+
+  @override
+  void prefetchVectorTiles(List<VectorTileCoord> tiles) {
+    if (tiles.isEmpty) return;
+    final payload = jsonEncode(tiles.map((t) => t.toJson()).toList());
+    _callBridge(
+      'window.KartaMapBridge && window.KartaMapBridge.prefetchTiles(${_jsStr(_containerId)}, ${_jsStr(payload)});',
+    );
+  }
+
+  @override
+  void setFeaturedPlaces(List<KartaMapFeaturedPin> places) {
+    final payload = jsonEncode(places.map((p) => p.toJson()).toList());
+    _callBridge(
+      'window.KartaMapBridge && window.KartaMapBridge.setFeaturedPlaces(${_jsStr(_containerId)}, ${_jsStr(payload)});',
+    );
+  }
+
+  @override
+  void setMapLanguage(String languageCode) {
+    _callBridge(
+      'window.KartaMapBridge && window.KartaMapBridge.setMapLanguage(${_jsStr(_containerId)}, ${_jsStr(languageCode)});',
+    );
+  }
+}
+
+/// Deterministic vector projection canvas used strictly for headless desktop
+/// widget tests and non-Web/non-mobile fallback targets.
 class _NativeKartaMapSurface extends StatefulWidget {
   const _NativeKartaMapSurface({
     required this.controller,
@@ -309,10 +922,13 @@ class _NativeKartaMapSurfaceState extends State<_NativeKartaMapSurface>
   }
 
   @override
-  void prefetchVectorTiles(List<VectorTileCoord> tiles) {
-    // Native MapLibre PlatformView binds directly to local PMTiles or HTTP cache;
-    // headless widget-test surface tracks prefetch calls without blocking paint.
-  }
+  void prefetchVectorTiles(List<VectorTileCoord> tiles) {}
+
+  @override
+  void setFeaturedPlaces(List<KartaMapFeaturedPin> places) {}
+
+  @override
+  void setMapLanguage(String languageCode) {}
 }
 
 class _VectorProjectionFallbackPainter extends CustomPainter {
@@ -402,74 +1018,16 @@ class _VectorProjectionFallbackPainter extends CustomPainter {
       canvas.drawCircle(pt, 3, Paint()..color = palette.textPrimary);
     }
 
-    // Cluster overlapping hazard pins cleanly at wide zoom levels (z < 12.0)
-    if (zoom < 12.0 && hazards.length > 1) {
-      final visited = List<bool>.filled(hazards.length, false);
-      const clusterRadiusPx = 44.0;
-      for (var i = 0; i < hazards.length; i++) {
-        if (visited[i]) continue;
-        visited[i] = true;
-        final anchorPt = _project(hazards[i].coordinate, size);
-        var sumX = anchorPt.dx;
-        var sumY = anchorPt.dy;
-        var count = 1;
-        var maxRank = _hazardSeverityRank(hazards[i].category);
-        for (var j = i + 1; j < hazards.length; j++) {
-          if (visited[j]) continue;
-          final ptJ = _project(hazards[j].coordinate, size);
-          if ((ptJ - anchorPt).distance <= clusterRadiusPx) {
-            visited[j] = true;
-            sumX += ptJ.dx;
-            sumY += ptJ.dy;
-            count += 1;
-            maxRank = math.max(maxRank, _hazardSeverityRank(hazards[j].category));
-          }
-        }
-        final centerPt = Offset(sumX / count, sumY / count);
-        final color = _colorForHazardRank(maxRank);
-        if (count > 1) {
-          canvas.drawCircle(centerPt, 18, Paint()..color = color.withValues(alpha: 0.24));
-          canvas.drawCircle(centerPt, 12, Paint()..color = color);
-          canvas.drawCircle(
-            centerPt,
-            12,
-            Paint()
-              ..color = palette.hudDeepGlass
-              ..style = PaintingStyle.stroke
-              ..strokeWidth = 2,
-          );
-          final tp = TextPainter(
-            text: TextSpan(
-              text: '$count',
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 10,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-            textDirection: TextDirection.ltr,
-          )..layout();
-          tp.paint(canvas, centerPt - Offset(tp.width / 2, tp.height / 2));
-        } else {
-          canvas.drawCircle(centerPt, 11, Paint()..color = color.withValues(alpha: 0.26));
-          canvas.drawCircle(centerPt, 6, Paint()..color = color);
-        }
-      }
-    } else {
-      for (final haz in hazards) {
-        final pt = _project(haz.coordinate, size);
-        final color = _colorForHazardRank(_hazardSeverityRank(haz.category));
-        canvas.drawCircle(pt, 12, Paint()..color = color.withValues(alpha: 0.26));
-        canvas.drawCircle(pt, 6, Paint()..color = color);
-      }
+    for (final haz in hazards) {
+      final pt = _project(haz.coordinate, size);
+      final color = _colorForHazardRank(_hazardSeverityRank(haz.category));
+      canvas.drawCircle(pt, 12, Paint()..color = color.withValues(alpha: 0.26));
+      canvas.drawCircle(pt, 6, Paint()..color = color);
     }
 
     for (final fuel in fuelPins) {
       final pt = _project(fuel.coordinate, size);
       final c = fuel.isCheapest ? palette.statusClear : palette.accentPrimary;
-      if (fuel.isCheapest) {
-        canvas.drawCircle(pt, 12, Paint()..color = c.withValues(alpha: 0.26));
-      }
       canvas.drawCircle(pt, fuel.isCheapest ? 7 : 5.5, Paint()..color = c);
     }
 

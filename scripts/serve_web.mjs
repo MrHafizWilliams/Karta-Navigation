@@ -15,8 +15,12 @@ const mimeTypes = {
   '.css': 'text/css; charset=utf-8',
   '.json': 'application/json; charset=utf-8',
   '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
   '.svg': 'image/svg+xml',
   '.ico': 'image/x-icon',
+  '.mp4': 'video/mp4',
+  '.webm': 'video/webm',
   '.woff2': 'font/woff2',
   '.otf': 'font/otf',
   '.ttf': 'font/ttf',
@@ -40,9 +44,37 @@ const server = http.createServer((req, res) => {
     target = path.join(rootDir, 'index.html');
   }
 
+  const stat = fs.statSync(target);
   const ext = path.extname(target).toLowerCase();
+  const contentType = mimeTypes[ext] || 'application/octet-stream';
+  const range = req.headers.range;
+
+  if (range) {
+    const parts = range.replace(/bytes=/, '').split('-');
+    const start = parseInt(parts[0], 10);
+    const end = parts[1] ? parseInt(parts[1], 10) : stat.size - 1;
+    if (Number.isNaN(start) || start < 0 || start >= stat.size || end >= stat.size) {
+      res.writeHead(416, { 'Content-Range': `bytes */${stat.size}` });
+      res.end();
+      return;
+    }
+    const chunkSize = end - start + 1;
+    res.writeHead(206, {
+      'Content-Range': `bytes ${start}-${end}/${stat.size}`,
+      'Accept-Ranges': 'bytes',
+      'Content-Length': chunkSize,
+      'Content-Type': contentType,
+      'Cache-Control': 'no-cache',
+      'Access-Control-Allow-Origin': '*',
+    });
+    fs.createReadStream(target, { start, end }).pipe(res);
+    return;
+  }
+
   res.writeHead(200, {
-    'Content-Type': mimeTypes[ext] || 'application/octet-stream',
+    'Content-Type': contentType,
+    'Content-Length': stat.size,
+    'Accept-Ranges': 'bytes',
     'Cache-Control': 'no-cache',
     'Access-Control-Allow-Origin': '*',
   });

@@ -29,6 +29,8 @@ extension type _KartaMapBridgeJs._(JSObject _) implements JSObject {
   external void setRoutes(String containerId, String payloadJson);
   external void setTurnArrows(String containerId, String payloadJson);
   external void setSavedPlaces(String containerId, String payloadJson);
+  external void setFeaturedPlaces(String containerId, String payloadJson);
+  external void setMapLanguage(String containerId, String languageCode);
   external void setPois(String containerId, String payloadJson);
   external void setTollGantries(String containerId, String payloadJson);
   external void setHazards(String containerId, String payloadJson);
@@ -82,6 +84,11 @@ extension type _KartaMapBridgeJs._(JSObject _) implements JSObject {
     JSFunction onPoiPinTap,
     JSFunction onViewportChanged,
     JSFunction onRouteCalloutTap,
+  );
+  external void registerPlaceCallbacks(
+    String containerId,
+    JSFunction onFeaturedPlaceTap,
+    JSFunction onVectorFeatureTap,
   );
   external void destroy(String containerId);
 }
@@ -190,6 +197,35 @@ class _WebKartaMapViewState extends State<_WebKartaMapView> implements KartaMapP
             }).toJS,
             ((int routeIndex) {
               if (mounted) widget.controller.notifyRouteCalloutTapped(routeIndex);
+            }).toJS,
+          );
+          bridge.registerPlaceCallbacks(
+            _containerId,
+            ((String placeId) {
+              if (mounted) widget.controller.notifyFeaturedPlaceTapped(placeId);
+            }).toJS,
+            ((String featureJson) {
+              if (!mounted) return;
+              try {
+                final m = jsonDecode(featureJson);
+                if (m is Map<String, dynamic>) {
+                  final lat = (m['lat'] as num?)?.toDouble();
+                  final lon = (m['lon'] as num?)?.toDouble();
+                  final name = (m['name'] as String?)?.trim() ?? '';
+                  if (lat != null && lon != null && name.isNotEmpty) {
+                    widget.controller.notifyVectorFeatureTapped(
+                      KartaVectorFeatureTap(
+                        name: name,
+                        featureClass: (m['featureClass'] as String?) ?? '',
+                        subclass: (m['subclass'] as String?) ?? '',
+                        religion: m['religion'] as String?,
+                        iata: m['iata'] as String?,
+                        coordinate: Coordinate(lat: lat, lon: lon),
+                      ),
+                    );
+                  }
+                }
+              } catch (_) {}
             }).toJS,
           );
           widget.controller.attachDriver(this);
@@ -312,6 +348,19 @@ class _WebKartaMapViewState extends State<_WebKartaMapView> implements KartaMapP
       _containerId,
       jsonEncode(savedPlaces.map((p) => p.toJson()).toList()),
     );
+  }
+
+  @override
+  void setFeaturedPlaces(List<KartaMapFeaturedPin> places) {
+    _kartaBridge?.setFeaturedPlaces(
+      _containerId,
+      jsonEncode(places.map((p) => p.toJson()).toList()),
+    );
+  }
+
+  @override
+  void setMapLanguage(String languageCode) {
+    _kartaBridge?.setMapLanguage(_containerId, languageCode);
   }
 
   @override

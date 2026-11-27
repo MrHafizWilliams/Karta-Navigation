@@ -13,9 +13,17 @@ CURRENCY_SPEC: dict[str, tuple[str, bool, int]] = {
     "MYR": ("RM", True, 2),
     "SGD": ("$", False, 2),
     "BND": ("B$", False, 2),
+    "IDR": ("Rp", True, 0),
+    "THB": ("฿", False, 2),
+    "PHP": ("₱", False, 2),
+    "VND": ("₫", False, 0),
+    "MMK": ("Ks", True, 0),
+    "LAK": ("₭", False, 0),
+    "KHR": ("៛", False, 0),
+    "USD": ("$", False, 2),
 }
 
-CANONICAL_ORDER = ("MYR", "SGD", "BND")
+CANONICAL_ORDER = ("MYR", "SGD", "BND", "IDR", "THB", "PHP", "VND", "MMK", "LAK", "KHR", "USD")
 
 
 def format_currency_minor(currency_code: str, amount_minor: int) -> CurrencyAmount:

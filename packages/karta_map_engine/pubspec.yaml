@@ -20,8 +20,14 @@ dependencies:
   karta_navigation_core:
     path: ../karta_navigation_core
   web: ^1.1.0
+  webview_flutter: ^4.10.0
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^5.0.0
+
+flutter:
+  assets:
+    - assets/karta_mobile_map.html
+    - assets/karta_map_bridge.js

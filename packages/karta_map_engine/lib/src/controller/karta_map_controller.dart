@@ -41,6 +41,8 @@ abstract class KartaMapPlatformDriver {
 
   void setTurnArrows(List<KartaMapTurnArrow> turnArrows);
   void setSavedPlaces(List<KartaMapSavedPlacePin> savedPlaces);
+  void setFeaturedPlaces(List<KartaMapFeaturedPin> places);
+  void setMapLanguage(String languageCode);
 
   void setPois(List<PoiItem> pois);
   void setTollGantries(List<GantryInfo> gantries);
@@ -120,6 +122,8 @@ class KartaMapController extends ChangeNotifier {
   double _bearing = 0.0;
   double _zoom = 6.2;
   Coordinate _center = const Coordinate(lat: 3.1579, lon: 101.7116);
+  bool _hasPendingCameraMove = false;
+  int _pendingCameraDurationMs = 650;
   KartaVehicleCustomization _vehicleCustomization = const KartaVehicleCustomization();
 
   // Buffered state applied once map finishes initializing
@@ -130,6 +134,8 @@ class KartaMapController extends ChangeNotifier {
   List<KartaMapRouteCallout> _lastRouteCallouts = const <KartaMapRouteCallout>[];
   List<KartaMapTurnArrow> _lastTurnArrows = const <KartaMapTurnArrow>[];
   List<KartaMapSavedPlacePin> _lastSavedPlaces = const <KartaMapSavedPlacePin>[];
+  List<KartaMapFeaturedPin> _lastFeaturedPlaces = const <KartaMapFeaturedPin>[];
+  String _mapLanguageCode = 'en';
   List<PoiItem> _lastPois = const <PoiItem>[];
   List<HazardRecord> _lastHazards = const <HazardRecord>[];
   List<FuelStationComparison> _lastFuelPins = const <FuelStationComparison>[];
@@ -147,6 +153,9 @@ class KartaMapController extends ChangeNotifier {
   final StreamController<String> _hazardPinTapController = StreamController<String>.broadcast();
   final StreamController<int> _poiPinTapController = StreamController<int>.broadcast();
   final StreamController<int> _routeCalloutTapController = StreamController<int>.broadcast();
+  final StreamController<String> _featuredPlaceTapController = StreamController<String>.broadcast();
+  final StreamController<KartaVectorFeatureTap> _vectorFeatureTapController =
+      StreamController<KartaVectorFeatureTap>.broadcast();
   final StreamController<KartaViewportBounds> _viewportChangedController =
       StreamController<KartaViewportBounds>.broadcast();
 
@@ -175,6 +184,8 @@ class KartaMapController extends ChangeNotifier {
   Stream<String> get onHazardPinTap => _hazardPinTapController.stream;
   Stream<int> get onPoiPinTap => _poiPinTapController.stream;
   Stream<int> get onRouteCalloutTap => _routeCalloutTapController.stream;
+  Stream<String> get onFeaturedPlaceTap => _featuredPlaceTapController.stream;
+  Stream<KartaVectorFeatureTap> get onVectorFeatureTap => _vectorFeatureTapController.stream;
   Stream<KartaViewportBounds> get onViewportChanged => _viewportChangedController.stream;
 
   void attachDriver(KartaMapPlatformDriver driver) {
@@ -203,6 +214,8 @@ class KartaMapController extends ChangeNotifier {
       );
     }
     if (_lastSavedPlaces.isNotEmpty) driver.setSavedPlaces(_lastSavedPlaces);
+    if (_lastFeaturedPlaces.isNotEmpty) driver.setFeaturedPlaces(_lastFeaturedPlaces);
+    if (_mapLanguageCode != 'en') driver.setMapLanguage(_mapLanguageCode);
     if (_lastPois.isNotEmpty) driver.setPois(_lastPois);
     if (_lastHazards.isNotEmpty) driver.setHazards(_lastHazards);
     if (_lastFuelPins.isNotEmpty) driver.setFuelPins(_lastFuelPins);
@@ -217,6 +230,22 @@ class KartaMapController extends ChangeNotifier {
     }
     if (_droppedPinCoord != null) {
       driver.setDroppedPin(coordinate: _droppedPinCoord, label: _droppedPinLabel);
+    }
+    // Replay any GPS auto-center or easeTo() issued before the map finished loading
+    final wasPending = _hasPendingCameraMove;
+    if (wasPending || (_userLocation != null && _userLocationVisible)) {
+      _hasPendingCameraMove = false;
+      final targetCenter = (_userLocation != null && _userLocationVisible)
+          ? _userLocation!
+          : _center;
+      final targetZoom = _zoom < 12.0 ? 15.6 : _zoom;
+      driver.easeCamera(
+        center: targetCenter,
+        zoom: targetZoom,
+        pitch: _is3DEnabled ? _pitch : 0.0,
+        bearing: _bearing,
+        durationMs: _pendingCameraDurationMs,
+      );
     }
     notifyListeners();
   }
@@ -244,6 +273,14 @@ class KartaMapController extends ChangeNotifier {
 
   void notifyRouteCalloutTapped(int routeIndex) {
     if (!_routeCalloutTapController.isClosed) _routeCalloutTapController.add(routeIndex);
+  }
+
+  void notifyFeaturedPlaceTapped(String placeId) {
+    if (!_featuredPlaceTapController.isClosed) _featuredPlaceTapController.add(placeId);
+  }
+
+  void notifyVectorFeatureTapped(KartaVectorFeatureTap tap) {
+    if (!_vectorFeatureTapController.isClosed) _vectorFeatureTapController.add(tap);
   }
 
   void notifyViewportChanged(KartaViewportBounds bounds) {
@@ -305,16 +342,22 @@ class KartaMapController extends ChangeNotifier {
     if (zoom != null) _zoom = zoom;
     if (pitch != null) _pitch = pitch;
     if (bearing != null) _bearing = bearing;
-    _driver?.easeCamera(
-      center: center,
-      zoom: zoom,
-      pitch: pitch,
-      bearing: bearing,
-      durationMs: durationMs,
-      paddingTop: paddingTop,
-      paddingBottom: paddingBottom,
-      paddingLeft: paddingLeft,
-    );
+    if (_driver == null) {
+      _hasPendingCameraMove = true;
+      _pendingCameraDurationMs = durationMs;
+    } else {
+      _hasPendingCameraMove = false;
+      _driver!.easeCamera(
+        center: center,
+        zoom: zoom,
+        pitch: pitch,
+        bearing: bearing,
+        durationMs: durationMs,
+        paddingTop: paddingTop,
+        paddingBottom: paddingBottom,
+        paddingLeft: paddingLeft,
+      );
+    }
     notifyListeners();
   }
 
@@ -713,6 +756,16 @@ class KartaMapController extends ChangeNotifier {
     _driver?.setSavedPlaces(savedPlaces);
   }
 
+  void setFeaturedPlaces(List<KartaMapFeaturedPin> places) {
+    _lastFeaturedPlaces = places;
+    _driver?.setFeaturedPlaces(places);
+  }
+
+  void setMapLanguage(String languageCode) {
+    _mapLanguageCode = languageCode;
+    _driver?.setMapLanguage(languageCode);
+  }
+
   void clearRoutes() {
     _lastPolylines = const <List<Coordinate>>[];
     _lastStops = const <KartaMapStopPin>[];
@@ -818,6 +871,8 @@ class KartaMapController extends ChangeNotifier {
     _hazardPinTapController.close();
     _poiPinTapController.close();
     _routeCalloutTapController.close();
+    _featuredPlaceTapController.close();
+    _vectorFeatureTapController.close();
     _viewportChangedController.close();
     super.dispose();
   }

@@ -180,7 +180,7 @@ class NavigationSessionController {
     required PositionSource positionSource,
     CountryContext? initialCountry,
   }) {
-    stopNavigation(scrubPrivacyState: false);
+    stopNavigation(scrubPrivacyState: false, emitIdle: false);
     _route = route;
     _geometry = RouteGeometryIndex.fromRoute(route);
     _flatManeuvers = _indexManeuvers(route, _geometry!);
@@ -352,7 +352,7 @@ class NavigationSessionController {
     );
   }
 
-  void stopNavigation({bool scrubPrivacyState = true}) {
+  void stopNavigation({bool scrubPrivacyState = true, bool emitIdle = true}) {
     _posSub?.cancel();
     _posSub = null;
     _route = null;
@@ -370,7 +370,9 @@ class NavigationSessionController {
     if (scrubPrivacyState && _privacyGuard.policy.scrubOnSessionEnd) {
       _privacyGuard.scrubEphemeralState();
     }
-    _emit(const NavigationSnapshot(phase: NavigationPhase.idle));
+    if (emitIdle) {
+      _emit(const NavigationSnapshot(phase: NavigationPhase.idle));
+    }
   }
 
   /// Explicitly scrubs ephemeral in-memory GPS state (e.g., on head-unit disconnect
@@ -486,6 +488,12 @@ class NavigationSessionController {
 
   void _maybeRefreshRoadContext(GpsFix fix) {
     if (_roadQueryInFlight) return;
+    if (_apiClient.isUsingPublicFallback) {
+      // Live routing is operating smoothly via public FOSSGIS Valhalla without a
+      // local PostGIS server — skip local `/v1/spatial/road-context` polling so
+      // connectivity stays Online without spurious offline-banner flapping.
+      return;
+    }
     if (_connectivityController?.current.isOffline == true) {
       // Tunnel / rural dead zone: rely smoothly on local route geometry & country inference
       // while ConnectivityResilienceController quietly probes recovery in the background.

@@ -212,9 +212,15 @@ class KartaHighwaySignboard extends StatelessWidget {
   }
 }
 
-/// Authentic Malaysian JKR/LLM pointed-top-and-bottom hexagonal route shield
-/// (`E1`, `E36`, `6`, `3113`, `P15`), Singapore LTA emerald expressway shield
-/// (`CTE`, `PIE`, `AYE`), and ASEAN Highway blue shield (`AH2`).
+/// Authentic official Southeast Asian route shields for Turn-by-Turn HUD:
+/// - Malaysia (`MY`) & Brunei (`BN`): JKR yellow pointed hexagon (`E1`, `E36`, `6`, `P15`)
+/// - Singapore (`SG`): LTA emerald green rounded shield (`CTE`, `PIE`, `AYE`)
+/// - Indonesia (`ID`): PM 13/2014 red-and-white Jalan Nasional hexagon / green Jalan Tol hexagon
+/// - Thailand (`TH`): DOH white Garuda-crest highway shield / blue tricolor motorway shield
+/// - Philippines (`PH`): DPWH white pointed pentagon (`N1`) / yellow expressway shield (`E1`, `NLEX`)
+/// - Vietnam (`VN`): QCVN 41 fluorescent yellow expressway (`CT.01`) / white national (`QL.1A`)
+/// - Myanmar (`MM`): RTAD emerald green highway shield (`E1`, `NH1`)
+/// - ASEAN Highway (`AH*`): Royal blue white-bordered shield (`AH1`, `AH2`, `AH26`)
 class _RegionalRouteShield extends StatelessWidget {
   const _RegionalRouteShield({
     required this.roadRef,
@@ -233,49 +239,234 @@ class _RegionalRouteShield extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final normalized = roadRef.trim().toUpperCase();
-    final isSingapore = countryCode.toUpperCase() == 'SG';
-    final isAsean = normalized.startsWith('AH');
+    final cc = countryCode.toUpperCase();
 
-    if (isAsean) {
+    if (normalized.startsWith('AH')) {
+      return _rectShield(
+        label: normalized,
+        bg: const Color(0xFF003DA5),
+        border: Colors.white,
+        textColor: Colors.white,
+      );
+    }
+
+    if (cc == 'SG') {
+      return _rectShield(
+        label: normalized,
+        bg: isExpressway ? const Color(0xFF006B44) : Colors.white,
+        border: isExpressway ? Colors.white : inkColor,
+        textColor: isExpressway ? Colors.white : inkColor,
+      );
+    }
+
+    if (cc == 'VN' || normalized.startsWith('CT') || normalized.startsWith('QL')) {
+      final isVnExp = isExpressway || normalized.startsWith('CT') || normalized.startsWith('ĐCT');
+      return _rectShield(
+        label: normalized,
+        bg: isVnExp ? const Color(0xFFF5E600) : Colors.white,
+        border: inkColor,
+        textColor: inkColor,
+      );
+    }
+
+    if (cc == 'MM' || normalized.startsWith('NH')) {
+      return _rectShield(
+        label: normalized,
+        bg: const Color(0xFF006B3F),
+        border: Colors.white,
+        textColor: Colors.white,
+      );
+    }
+
+    if (cc == 'TL') {
+      final isSec = normalized.startsWith('B');
+      return _rectShield(
+        label: normalized,
+        bg: isSec ? const Color(0xFF004B8D) : const Color(0xFF006B44),
+        border: Colors.white,
+        textColor: Colors.white,
+      );
+    }
+
+    if (cc == 'LA') {
+      if (isExpressway || normalized.startsWith('E')) {
+        return _rectShield(
+          label: normalized,
+          bg: const Color(0xFF007A3D),
+          border: Colors.white,
+          textColor: Colors.white,
+        );
+      }
       return Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
         decoration: BoxDecoration(
-          color: const Color(0xFF003DA5),
+          color: Colors.white,
           borderRadius: BorderRadius.circular(5),
-          border: Border.all(color: Colors.white, width: 1.5),
+          border: Border.all(color: const Color(0xFFCE1126), width: 1.5),
         ),
-        child: Text(
-          normalized,
-          style: KartaTypography.monoBadge.copyWith(
-            color: Colors.white,
-            fontSize: 11,
-            fontWeight: FontWeight.w800,
+        clipBehavior: Clip.antiAlias,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            Container(height: 4, width: 32, color: const Color(0xFFCE1126)),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              child: Text(
+                normalized,
+                style: KartaTypography.monoBadge.copyWith(
+                  color: inkColor,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                  height: 1.0,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (cc == 'KH') {
+      if (isExpressway || normalized.startsWith('E')) {
+        return _rectShield(
+          label: normalized,
+          bg: const Color(0xFF006B3F),
+          border: const Color(0xFFFFD100),
+          textColor: Colors.white,
+        );
+      }
+      return CustomPaint(
+        painter: const _CambodiaShieldPainter(),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(10, 6, 10, 7),
+          child: Text(
+            normalized,
+            style: KartaTypography.monoBadge.copyWith(
+              color: const Color(0xFF032EA1),
+              fontSize: 11,
+              fontWeight: FontWeight.w800,
+              height: 1.0,
+            ),
           ),
         ),
       );
     }
 
-    if (isSingapore) {
+    if (cc == 'PH') {
+      final isPhExp = isExpressway || normalized.startsWith('E');
+      if (isPhExp) {
+        return _rectShield(
+          label: normalized,
+          bg: const Color(0xFFFFD100),
+          border: inkColor,
+          textColor: inkColor,
+        );
+      }
+      return CustomPaint(
+        painter: _PhilippinesPentagonPainter(inkColor: inkColor),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(10, 8, 10, 5),
+          child: Text(
+            normalized,
+            style: KartaTypography.monoBadge.copyWith(
+              color: inkColor,
+              fontSize: 11,
+              fontWeight: FontWeight.w800,
+              height: 1.0,
+            ),
+          ),
+        ),
+      );
+    }
+
+    if (cc == 'TH') {
+      if (isExpressway || normalized.startsWith('M')) {
+        return Container(
+          decoration: BoxDecoration(
+            color: const Color(0xFF0047AB),
+            borderRadius: BorderRadius.circular(5),
+            border: Border.all(color: Colors.white, width: 1.4),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              Container(height: 3.5, width: 32, color: const Color(0xFFCE1126)),
+              Container(height: 1.5, width: 32, color: Colors.white),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                child: Text(
+                  normalized,
+                  style: KartaTypography.monoBadge.copyWith(
+                    color: Colors.white,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    height: 1.0,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      }
       return Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        padding: const EdgeInsets.fromLTRB(8, 3, 8, 4),
         decoration: BoxDecoration(
-          color: isExpressway ? const Color(0xFF006B44) : Colors.white,
-          borderRadius: BorderRadius.circular(6),
-          border: Border.all(color: Colors.white, width: 1.5),
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(5),
+          border: Border.all(color: inkColor, width: 1.6),
         ),
-        child: Text(
-          normalized,
-          style: KartaTypography.monoBadge.copyWith(
-            color: isExpressway ? Colors.white : inkColor,
-            fontSize: 11,
-            fontWeight: FontWeight.w800,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            Container(
+              width: 12,
+              height: 3.5,
+              margin: const EdgeInsets.only(bottom: 2),
+              decoration: BoxDecoration(
+                color: const Color(0xFFB91C1C),
+                borderRadius: BorderRadius.circular(999),
+              ),
+            ),
+            Text(
+              normalized,
+              style: KartaTypography.monoBadge.copyWith(
+                color: inkColor,
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+                height: 1.0,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (cc == 'ID') {
+      final isTol = isExpressway || normalized.startsWith('TOL');
+      return CustomPaint(
+        painter: _MalaysianJkrHexagonPainter(
+          fillColor: isTol ? const Color(0xFF006B44) : Colors.white,
+          innerBorderColor: isTol ? const Color(0xFFFFD100) : inkColor,
+          outerRimColor: isTol ? Colors.white : const Color(0xFFD61F26),
+          outerRimWidth: 1.7,
+          topBannerColor: isTol ? null : const Color(0xFFD61F26),
+        ),
+        child: Padding(
+          padding: EdgeInsets.fromLTRB(11, isTol ? 6 : 8, 11, 5),
+          child: Text(
+            normalized,
+            style: KartaTypography.monoBadge.copyWith(
+              color: isTol ? Colors.white : inkColor,
+              fontSize: 11.5,
+              fontWeight: FontWeight.w800,
+              height: 1.0,
+            ),
           ),
         ),
       );
     }
 
-    // Authentic Malaysian JKR / LLM vertical-walled pointed-top-and-bottom hexagon:
-    // JKR Yellow body + crisp black inner hexagonal border + optional LLM Emerald outer rim.
+    // Authentic Malaysian JKR / LLM & Brunei vertical-walled pointed-top-and-bottom hexagon:
     final isMyExpressway = isExpressway || normalized.startsWith('E');
     return CustomPaint(
       painter: _MalaysianJkrHexagonPainter(
@@ -300,6 +491,97 @@ class _RegionalRouteShield extends StatelessWidget {
       ),
     );
   }
+
+  Widget _rectShield({
+    required String label,
+    required Color bg,
+    required Color border,
+    required Color textColor,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(5),
+        border: Border.all(color: border, width: 1.5),
+      ),
+      child: Text(
+        label,
+        style: KartaTypography.monoBadge.copyWith(
+          color: textColor,
+          fontSize: 11,
+          fontWeight: FontWeight.w800,
+          height: 1.0,
+        ),
+      ),
+    );
+  }
+}
+
+class _PhilippinesPentagonPainter extends CustomPainter {
+  const _PhilippinesPentagonPainter({required this.inkColor});
+
+  final Color inkColor;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final rect = (Offset.zero & size).deflate(0.8);
+    final roofY = rect.top + rect.height * 0.28;
+    final path = Path()
+      ..moveTo(rect.center.dx, rect.top)
+      ..lineTo(rect.right, roofY)
+      ..lineTo(rect.right, rect.bottom)
+      ..lineTo(rect.left, rect.bottom)
+      ..lineTo(rect.left, roofY)
+      ..close();
+    canvas.drawPath(path, Paint()..color = Colors.white);
+    canvas.drawPath(
+      path,
+      Paint()
+        ..color = inkColor
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.6,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _PhilippinesPentagonPainter oldDelegate) =>
+      oldDelegate.inkColor != inkColor;
+}
+
+class _CambodiaShieldPainter extends CustomPainter {
+  const _CambodiaShieldPainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final rect = (Offset.zero & size).deflate(0.8);
+    final shoulderY = rect.bottom - rect.height * 0.28;
+    final path = Path()
+      ..moveTo(rect.left, rect.top)
+      ..lineTo(rect.right, rect.top)
+      ..lineTo(rect.right, shoulderY)
+      ..lineTo(rect.center.dx, rect.bottom)
+      ..lineTo(rect.left, shoulderY)
+      ..close();
+    canvas.drawPath(path, Paint()..color = Colors.white);
+    canvas.save();
+    canvas.clipPath(path);
+    canvas.drawRect(
+      Rect.fromLTWH(rect.left, rect.top, rect.width, 3.5),
+      Paint()..color = const Color(0xFF032EA1),
+    );
+    canvas.restore();
+    canvas.drawPath(
+      path,
+      Paint()
+        ..color = const Color(0xFF032EA1)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.5,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _CambodiaShieldPainter oldDelegate) => false;
 }
 
 class _MalaysianJkrHexagonPainter extends CustomPainter {
@@ -308,12 +590,14 @@ class _MalaysianJkrHexagonPainter extends CustomPainter {
     required this.innerBorderColor,
     required this.outerRimColor,
     this.outerRimWidth = 1.4,
+    this.topBannerColor,
   });
 
   final Color fillColor;
   final Color innerBorderColor;
   final Color outerRimColor;
   final double outerRimWidth;
+  final Color? topBannerColor;
 
   Path _buildRoundedJkrHexPath(Rect rect, double cornerRadius) {
     final cx = rect.center.dx;
@@ -361,6 +645,15 @@ class _MalaysianJkrHexagonPainter extends CustomPainter {
         ..color = fillColor
         ..style = PaintingStyle.fill,
     );
+    if (topBannerColor != null) {
+      canvas.save();
+      canvas.clipPath(outerPath);
+      canvas.drawRect(
+        Rect.fromLTWH(0, 0, size.width, size.height * 0.30),
+        Paint()..color = topBannerColor!,
+      );
+      canvas.restore();
+    }
     canvas.drawPath(
       outerPath,
       Paint()

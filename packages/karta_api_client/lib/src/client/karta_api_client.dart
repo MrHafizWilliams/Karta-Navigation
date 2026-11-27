@@ -11,6 +11,7 @@ import '../models/routing.dart';
 import '../models/spatial.dart';
 import '../models/tolls.dart';
 import '../models/users.dart';
+import 'public_valhalla_fallback.dart';
 
 class KartaApiException implements Exception {
   const KartaApiException({
@@ -43,6 +44,11 @@ class KartaApiClient {
   final http.Client _http;
   final bool _ownsClient;
   final Duration _timeout;
+  bool _usingPublicFallback = false;
+
+  /// True when the local self-hosted backend (`localhost:8000`) is not running
+  /// and live routing is transparently served by public FOSSGIS Valhalla / OSRM.
+  bool get isUsingPublicFallback => _usingPublicFallback;
 
   Uri _uri(String path, [Map<String, String>? queryParameters]) {
     final raw = Uri.parse('$baseUrl$path');
@@ -50,9 +56,44 @@ class KartaApiClient {
     return raw.replace(queryParameters: queryParameters);
   }
 
+  bool get _isLocalHostBase {
+    final lower = baseUrl.toLowerCase();
+    return lower.contains('localhost') || lower.contains('127.0.0.1');
+  }
+
   Future<KartaHealthStatus> getHealth() async {
-    final json = await _getJson('/v1/health') as Map<String, dynamic>;
-    return KartaHealthStatus.fromJson(json);
+    try {
+      final resp = await _http
+          .get(
+            _uri('/v1/health'),
+            headers: const <String, String>{'Accept': 'application/json'},
+          )
+          .timeout(_isLocalHostBase ? const Duration(seconds: 3) : _timeout);
+      final json = _decode(resp) as Map<String, dynamic>;
+      _usingPublicFallback = false;
+      return KartaHealthStatus.fromJson(json);
+    } catch (_) {
+      final publicOk = await PublicValhallaFallback.probeAlive(_http);
+      if (publicOk) {
+        _usingPublicFallback = true;
+        return const KartaHealthStatus(
+          status: 'ok',
+          service: 'karta-public-valhalla',
+          postgisOk: false,
+          redisOk: false,
+          valhallaReachable: true,
+          valhallaVersion: 'FOSSGIS Valhalla',
+          pmtilesReachable: true,
+          pmtilesPublicUrl: 'https://tiles.openfreemap.org/planet',
+          routingProfiles: <String>[
+            'drive_fastest',
+            'drive_no_highways',
+            'drive_motorcycle',
+          ],
+        );
+      }
+      rethrow;
+    }
   }
 
   /// Lightweight low-timeout liveness probe used for silent tunnel/dead-zone recovery.
@@ -61,10 +102,16 @@ class KartaApiClient {
       final resp = await _http
           .get(_uri('/v1/health/live'), headers: const <String, String>{'Accept': 'application/json'})
           .timeout(timeout);
-      return resp.statusCode >= 200 && resp.statusCode < 300;
-    } catch (_) {
-      return false;
+      if (resp.statusCode >= 200 && resp.statusCode < 300) {
+        _usingPublicFallback = false;
+        return true;
+      }
+    } catch (_) {}
+    final publicOk = await PublicValhallaFallback.probeAlive(_http, timeout: timeout);
+    if (publicOk) {
+      _usingPublicFallback = true;
     }
+    return publicOk;
   }
 
   Future<TilePrefetchResponse> getPredictiveTilePlan(TilePrefetchRequest request) async {
@@ -92,8 +139,27 @@ class KartaApiClient {
   }
 
   Future<RouteResponse> computeRoute(RouteRequest request) async {
-    final json = await _postJson('/v1/routes', request.toJson()) as Map<String, dynamic>;
-    return RouteResponse.fromJson(json);
+    try {
+      final resp = await _http
+          .post(
+            _uri('/v1/routes'),
+            headers: const <String, String>{
+              'Content-Type': 'application/json',
+              'Accept': 'application/json',
+            },
+            body: jsonEncode(request.toJson()),
+          )
+          .timeout(_isLocalHostBase ? const Duration(seconds: 3) : _timeout);
+      final json = _decode(resp) as Map<String, dynamic>;
+      _usingPublicFallback = false;
+      return RouteResponse.fromJson(json);
+    } catch (_) {
+      // Automatically fall back to real public Valhalla (FOSSGIS) / OSRM when
+      // self-hosted Docker backend is not running.
+      final fallback = await PublicValhallaFallback.computeRoute(_http, request);
+      _usingPublicFallback = true;
+      return fallback;
+    }
   }
 
   Future<PoiBBoxResponse> getPoisInBbox({

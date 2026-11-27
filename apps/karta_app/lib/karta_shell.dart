@@ -1,5 +1,7 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:karta_api_client/karta_api_client.dart';
 import 'package:karta_automotive_bridge/karta_automotive_bridge.dart';
@@ -7,6 +9,7 @@ import 'package:karta_design_system/karta_design_system.dart';
 import 'package:karta_map_engine/karta_map_engine.dart';
 import 'package:karta_navigation_core/karta_navigation_core.dart';
 
+import 'data/sea_featured_places.dart';
 import 'features/account/account_saved_places_panel.dart';
 import 'features/automotive/companion_turn_list_overlay.dart';
 import 'features/commuter/commuter_hub_panel.dart';
@@ -17,13 +20,16 @@ import 'features/look_around/street_look_around_modal.dart';
 import 'features/navigation/active_navigation_hud.dart';
 import 'features/offline/offline_map_manager_panel.dart';
 import 'features/personalization/studio_panel.dart';
+import 'features/search/floating_explore_search_bar.dart';
 import 'features/search/unified_search_panel.dart';
 import 'services/live_location_platform.dart';
 import 'state/auth_saved_places_providers.dart';
 import 'state/karta_app_state.dart';
+import 'state/language_providers.dart';
 import 'state/lighting_providers.dart';
 import 'state/phase3_providers.dart';
 import 'state/phase4_automotive_providers.dart';
+import 'state/region_welcome_providers.dart';
 
 /// Root responsive shell adapting seamlessly across Smartphone (< 640dp),
 /// Tablet & Standard Automotive (640–1079dp), and Desktop & Wide Automotive
@@ -40,8 +46,11 @@ class _KartaAppShellState extends ConsumerState<KartaAppShell> {
   StreamSubscription<Coordinate>? _mapTapSub;
   StreamSubscription<int>? _poiTapSub;
   StreamSubscription<int>? _routeCalloutTapSub;
+  StreamSubscription<String>? _featuredPlaceTapSub;
+  StreamSubscription<KartaVectorFeatureTap>? _vectorFeatureTapSub;
   StreamSubscription<KartaViewportBounds>? _viewportSub;
   DateTime? _lastBboxPoiFetch;
+  bool _exitDialogOpen = false;
 
   @override
   void initState() {
@@ -55,9 +64,13 @@ class _KartaAppShellState extends ConsumerState<KartaAppShell> {
       ref.read(liveLocationProvider.notifier).startTracking(centerOnFirstFix: true);
 
       final mapCtrl = ref.read(kartaMapControllerProvider);
+      mapCtrl.setFeaturedPlaces(SeaFeaturedPlacesCatalog.toMapPins());
+      mapCtrl.setMapLanguage(ref.read(kartaLanguageProvider).code);
       _mapTapSub = mapCtrl.onMapTap.listen(_handleMapTap);
       _poiTapSub = mapCtrl.onPoiPinTap.listen(_handlePoiPinTap);
       _routeCalloutTapSub = mapCtrl.onRouteCalloutTap.listen(_handleRouteCalloutTap);
+      _featuredPlaceTapSub = mapCtrl.onFeaturedPlaceTap.listen(_handleFeaturedPlaceTap);
+      _vectorFeatureTapSub = mapCtrl.onVectorFeatureTap.listen(_handleVectorFeatureTap);
       _viewportSub = mapCtrl.onViewportChanged.listen(_handleViewportChanged);
     });
   }
@@ -67,8 +80,42 @@ class _KartaAppShellState extends ConsumerState<KartaAppShell> {
     _mapTapSub?.cancel();
     _poiTapSub?.cancel();
     _routeCalloutTapSub?.cancel();
+    _featuredPlaceTapSub?.cancel();
+    _vectorFeatureTapSub?.cancel();
     _viewportSub?.cancel();
     super.dispose();
+  }
+
+  void _handleFeaturedPlaceTap(String placeId) {
+    if (!mounted) return;
+    final navPhase = ref.read(navigationSessionProvider).current.phase;
+    if (navPhase == NavigationPhase.navigating) return;
+    final place = SeaFeaturedPlacesCatalog.findById(placeId);
+    if (place == null) return;
+    _openFeaturedPlace(place);
+  }
+
+  void _handleVectorFeatureTap(KartaVectorFeatureTap tap) {
+    if (!mounted) return;
+    final navPhase = ref.read(navigationSessionProvider).current.phase;
+    if (navPhase == NavigationPhase.navigating) return;
+    final resolved = SeaFeaturedPlacesCatalog.fromVectorTap(tap);
+    _openFeaturedPlace(resolved);
+  }
+
+  void _openFeaturedPlace(KartaFeaturedPlace place) {
+    final mapCtrl = ref.read(kartaMapControllerProvider);
+    ref.read(selectedFeaturedPlaceProvider.notifier).state = place;
+    ref.read(selectedPoiProvider.notifier).state = null;
+    ref.read(inspectedMapSpotProvider.notifier).state = null;
+    mapCtrl.setDroppedPin(coordinate: place.coordinate, label: place.shortLabel);
+    ref.read(activeNavTabProvider.notifier).state = 'navigate';
+    ref.read(mobileExploreExpandedProvider.notifier).state = true;
+    mapCtrl.easeTo(
+      center: place.coordinate,
+      zoom: mapCtrl.zoom < 14.5 ? 15.2 : mapCtrl.zoom,
+      pitch: mapCtrl.is3DEnabled ? 50 : 0,
+    );
   }
 
   void _handleRouteCalloutTap(int routeIndex) {
@@ -118,6 +165,7 @@ class _KartaAppShellState extends ConsumerState<KartaAppShell> {
     ref.read(inspectedMapSpotProvider.notifier).state = null;
     mapCtrl.setDroppedPin(coordinate: matched.coordinate, label: matched.name);
     ref.read(activeNavTabProvider.notifier).state = 'navigate';
+    ref.read(mobileExploreExpandedProvider.notifier).state = true;
     mapCtrl.easeTo(center: matched.coordinate, zoom: 16.0, pitch: mapCtrl.is3DEnabled ? 54 : 0);
   }
 
@@ -128,6 +176,7 @@ class _KartaAppShellState extends ConsumerState<KartaAppShell> {
 
     final mapCtrl = ref.read(kartaMapControllerProvider);
     final coordText = '${coord.lat.toStringAsFixed(5)}, ${coord.lon.toStringAsFixed(5)}';
+    ref.read(selectedFeaturedPlaceProvider.notifier).state = null;
     ref.read(selectedPoiProvider.notifier).state = null;
     ref.read(inspectedMapSpotProvider.notifier).state = InspectedMapSpot(
       coordinate: coord,
@@ -137,6 +186,7 @@ class _KartaAppShellState extends ConsumerState<KartaAppShell> {
     );
     mapCtrl.setDroppedPin(coordinate: coord, label: 'Dropped Pin');
     ref.read(activeNavTabProvider.notifier).state = 'navigate';
+    ref.read(mobileExploreExpandedProvider.notifier).state = true;
 
     try {
       final ctx = await ref.read(kartaApiClientProvider).getRoadContext(
@@ -174,6 +224,39 @@ class _KartaAppShellState extends ConsumerState<KartaAppShell> {
     }
   }
 
+  Future<void> _handleExitRequest({required bool isNavigating}) async {
+    if (_exitDialogOpen || !mounted) return;
+    _exitDialogOpen = true;
+    try {
+      final confirmed = await showKartaExitConfirmationDialog(
+        context,
+        isNavigating: isNavigating,
+      );
+      if (!confirmed || !mounted) return;
+
+      // Gracefully pause GPS & active guidance before exiting
+      if (isNavigating) {
+        ref.read(navigationSessionProvider).stopNavigation();
+      }
+      ref.read(liveLocationProvider.notifier).stopTracking();
+
+      if (kIsWeb) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(context.kartaStrings.gpsPausedSnack),
+              duration: const Duration(seconds: 3),
+            ),
+          );
+        }
+      } else {
+        await SystemNavigator.pop();
+      }
+    } finally {
+      _exitDialogOpen = false;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final mapCtrl = ref.watch(kartaMapControllerProvider);
@@ -186,6 +269,9 @@ class _KartaAppShellState extends ConsumerState<KartaAppShell> {
     final lighting = ref.watch(kartaLightingProvider);
     final liveLoc = ref.watch(liveLocationProvider);
     final mobileSheetExpanded = ref.watch(mobileNavSheetExpandedProvider);
+    final mobileExploreExpanded = ref.watch(mobileExploreExpandedProvider);
+    final directionsDrawerOpen = ref.watch(directionsDrawerOpenProvider);
+    final plannerState = ref.watch(routePlannerProvider);
     final autoConn = ref.watch(automotiveConnectionProvider).valueOrNull ??
         const AutomotiveConnectionState();
     final companionEnabled = ref.watch(companionTurnListEnabledProvider);
@@ -194,7 +280,8 @@ class _KartaAppShellState extends ConsumerState<KartaAppShell> {
         ref.read(connectivityResilienceProvider).current;
 
     final navSnap = navSnapAsync.valueOrNull ?? const NavigationSnapshot(phase: NavigationPhase.idle);
-    final isNavigating = navSnap.phase == NavigationPhase.navigating;
+    final isNavigating = navSnap.phase == NavigationPhase.navigating ||
+        navSnap.phase == NavigationPhase.arrived;
     final showCompanionMode = autoConn.isConnected && companionEnabled && isNavigating;
     final showAutomotiveStrip = autoConn.isConnected ||
         (thermalProfile != null && thermalProfile.effectiveTier != DeviceThermalLevel.nominal);
@@ -205,19 +292,22 @@ class _KartaAppShellState extends ConsumerState<KartaAppShell> {
     };
 
     final authState = ref.watch(authSavedPlacesProvider);
+    final activeLanguage = ref.watch(kartaLanguageProvider);
+    final regionWelcome = ref.watch(regionWelcomeProvider);
+    final l10n = context.kartaStrings;
     final navItems = <KartaNavRailItem>[
-      const KartaNavRailItem(id: 'navigate', label: 'Navigate', icon: Icons.explore_rounded),
+      KartaNavRailItem(id: 'navigate', label: l10n.navNavigate, icon: Icons.explore_rounded),
       KartaNavRailItem(
         id: 'saved',
-        label: 'Saved',
+        label: l10n.navSaved,
         icon: Icons.bookmarks_rounded,
         badgeCount: authState.savedPlaces.length,
       ),
-      const KartaNavRailItem(id: 'commute', label: 'Commute', icon: Icons.commute_rounded),
-      const KartaNavRailItem(
-          id: 'offline', label: 'Offline', icon: Icons.download_for_offline_rounded),
-      const KartaNavRailItem(
-          id: 'vehicle', label: 'Vehicle', icon: Icons.navigation_rounded),
+      KartaNavRailItem(id: 'commute', label: l10n.navCommute, icon: Icons.commute_rounded),
+      KartaNavRailItem(
+          id: 'offline', label: l10n.navOffline, icon: Icons.download_for_offline_rounded),
+      KartaNavRailItem(
+          id: 'vehicle', label: l10n.navVehicle, icon: Icons.navigation_rounded),
     ];
 
     final Widget activeSidePanel = AnimatedSwitcher(
@@ -274,6 +364,42 @@ class _KartaAppShellState extends ConsumerState<KartaAppShell> {
                 const SizedBox(height: 6),
               ],
               if (isNavigating) TopManeuverHudBanner(snapshot: navSnap),
+              if (isNavigating)
+                AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 320),
+                  switchInCurve: Curves.easeOutCubic,
+                  switchOutCurve: Curves.easeInCubic,
+                  transitionBuilder: (child, animation) => FadeTransition(
+                    opacity: animation,
+                    child: SlideTransition(
+                      position: Tween<Offset>(
+                        begin: const Offset(0, -0.25),
+                        end: Offset.zero,
+                      ).animate(animation),
+                      child: child,
+                    ),
+                  ),
+                  child: regionWelcome.isVisible
+                      ? Padding(
+                          key: ValueKey<String>(
+                            'welcome-${regionWelcome.activeBannerRegion!.id}-${regionWelcome.bannerSequence}',
+                          ),
+                          padding: const EdgeInsets.only(top: 10),
+                          child: Align(
+                            alignment: Alignment.topCenter,
+                            child: KartaRegionWelcomeBanner(
+                              flagId: regionWelcome.activeBannerRegion!.flagId,
+                              regionName: regionWelcome.activeBannerRegion!.name,
+                              localName: regionWelcome.activeBannerRegion!.localName,
+                              countryName: regionWelcome.activeBannerRegion!.countryName,
+                              tagline: regionWelcome.activeBannerRegion!.tagline,
+                              onDismiss: () =>
+                                  ref.read(regionWelcomeProvider.notifier).dismissBanner(),
+                            ),
+                          ),
+                        )
+                      : const SizedBox.shrink(key: ValueKey<String>('welcome-empty')),
+                ),
             ],
           )
         : null;
@@ -331,81 +457,165 @@ class _KartaAppShellState extends ConsumerState<KartaAppShell> {
       }
     }
 
-    return KartaAdaptiveScaffold(
-      navItems: navItems,
-      selectedNavId: selectedTab,
-      onSelectNav: (id) => ref.read(activeNavTabProvider.notifier).state = id,
-      hideSidePanel: isNavigating && selectedTab == 'navigate',
-      mobileSheetExpanded: mobileSheetExpanded,
-      mapLayer: KartaMapView(
-        controller: mapCtrl,
-        pmtilesUrl: pmtilesUrl,
-        initialCenter: liveLoc.coordinate ?? KartaRegionalAnchors.klcc.coordinate,
-        initialZoom: 14.8,
-        initialPitch: 48.0,
-      ),
-      sidePanel: activeSidePanel,
-      topHudOverlay: topHudStack,
-      cornerHazardOverlay: const SpatialHazardCornerPill(),
-      topRightControls: _MapUtilityButtons(
-        axis: Axis.vertical,
-        mapCtrl: mapCtrl,
-        lighting: lighting,
-        liveLocation: liveLoc,
-        isNavigating: isNavigating,
-        onCycleLighting: () => ref.read(kartaLightingProvider.notifier).cyclePreference(),
-        onOpenLookAround: handleOpenLookAround,
-        onRecenter: handleRecenter,
-      ),
-      topRightControlsHorizontal: _MapUtilityButtons(
-        axis: Axis.horizontal,
-        mapCtrl: mapCtrl,
-        lighting: lighting,
-        liveLocation: liveLoc,
-        isNavigating: isNavigating,
-        onCycleLighting: () => ref.read(kartaLightingProvider.notifier).cyclePreference(),
-        onOpenLookAround: handleOpenLookAround,
-        onRecenter: handleRecenter,
-      ),
-      floatingRightOverlay: const FloatingCrowdsourcingTriggerCluster(),
-      bottomLeftOverlay: isNavigating ? SpeedTelemetryCluster(snapshot: navSnap) : null,
-      bottomCenterOverlay: bottomCenterWidget,
-      bottomVoiceWaveformOverlay: voiceState.isVisible ? const BottomVoiceWaveformPill() : null,
-      mobileActiveSheetOverlay: isNavigating ? MobileActiveNavigationSheet(snapshot: navSnap) : null,
-      bottomRightOverlay: null,
-      companionOverlay: IgnorePointer(
-        ignoring: !showCompanionMode,
-        child: AnimatedSwitcher(
-          duration: const Duration(milliseconds: 360),
-          reverseDuration: const Duration(milliseconds: 300),
-          switchInCurve: Curves.easeOutCubic,
-          switchOutCurve: Curves.easeInCubic,
-          transitionBuilder: (child, animation) {
-            final slide = Tween<Offset>(
-              begin: const Offset(0, 0.05),
-              end: Offset.zero,
-            ).animate(animation);
-            return FadeTransition(
-              opacity: animation,
-              child: SlideTransition(position: slide, child: child),
-            );
-          },
-          child: showCompanionMode
-              ? KartaPointerShield(
-                  key: const ValueKey<String>('karta-companion-turn-list'),
-                  child: KartaCompanionTurnListOverlay(
-                    snapshot: navSnap,
-                    connection: autoConn,
-                    thermal: thermalProfile,
-                    lighting: lighting,
-                    onShowLiveMap: () =>
-                        ref.read(companionTurnListEnabledProvider.notifier).state = false,
-                  ),
-                )
-              : const SizedBox.shrink(key: ValueKey<String>('karta-companion-empty')),
+    final mobileCollapsedSubtitle = liveLoc.hasLiveFix
+        ? (liveLoc.placeLabel ?? l10n.liveGpsTapToSearch)
+        : l10n.whereToPrompt;
+
+    Future<void> handleOpenLanguage() async {
+      final chosen = await showKartaLanguageDialog(
+        context,
+        currentLanguage: activeLanguage,
+      );
+      if (chosen != null && mounted) {
+        ref.read(kartaLanguageProvider.notifier).setLanguage(chosen);
+      }
+    }
+
+    final bool showGoogleFloatingSearch = selectedTab == 'navigate' &&
+        !isNavigating &&
+        !directionsDrawerOpen &&
+        plannerState.routeResponse == null;
+    final bool isWideViewport =
+        KartaBreakpoints.resolve(MediaQuery.sizeOf(context).width) !=
+            KartaViewportClass.compact;
+
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (bool didPop, Object? result) {
+        if (didPop) return;
+        // Waze-style layered Back handling before exit confirmation:
+        if (rtState.radialMenuOpen) {
+          ref.read(realtimeCrowdsourcingProvider.notifier).toggleRadialMenu(false);
+          return;
+        }
+        if (lookAroundTarget != null) {
+          ref.read(lookAroundTargetProvider.notifier).state = null;
+          return;
+        }
+        if (rtState.activeFuelOverlayOpen) {
+          ref.read(realtimeCrowdsourcingProvider.notifier).toggleFuelOverlay(false);
+          return;
+        }
+        if (directionsDrawerOpen) {
+          ref.read(directionsDrawerOpenProvider.notifier).state = false;
+          return;
+        }
+        if (mobileExploreExpanded) {
+          ref.read(mobileExploreExpandedProvider.notifier).state = false;
+          return;
+        }
+        if (ref.read(selectedFeaturedPlaceProvider) != null ||
+            ref.read(inspectedMapSpotProvider) != null ||
+            ref.read(selectedPoiProvider) != null) {
+          ref.read(selectedFeaturedPlaceProvider.notifier).state = null;
+          ref.read(inspectedMapSpotProvider.notifier).state = null;
+          ref.read(selectedPoiProvider.notifier).state = null;
+          mapCtrl.setDroppedPin(coordinate: null);
+          return;
+        }
+        unawaited(_handleExitRequest(isNavigating: isNavigating));
+      },
+      child: KartaAdaptiveScaffold(
+        navItems: navItems,
+        selectedNavId: selectedTab,
+        onSelectNav: (id) {
+          ref.read(activeNavTabProvider.notifier).state = id;
+          if (id == 'navigate' && plannerState.routeResponse == null) {
+            ref.read(directionsDrawerOpenProvider.notifier).state = false;
+          }
+        },
+        hideSidePanel:
+            (isNavigating && selectedTab == 'navigate') ||
+            (isWideViewport && showGoogleFloatingSearch),
+        topSearchOverlay:
+            (isWideViewport && showGoogleFloatingSearch)
+                ? const KartaFloatingExploreSearchBar()
+                : null,
+        mobileSheetExpanded: mobileSheetExpanded,
+        mobileExploreExpanded: mobileExploreExpanded,
+        onToggleMobileExplore: () =>
+            ref.read(mobileExploreExpandedProvider.notifier).state = !mobileExploreExpanded,
+        mobileExploreCollapsedSubtitle: mobileCollapsedSubtitle,
+        onOpenLanguage: () => unawaited(handleOpenLanguage()),
+        languageBadge: activeLanguage.shortBadge,
+        languageTooltip: '${l10n.selectLanguageTitle} (${activeLanguage.nativeName})',
+        onOpenProfile: () => ref.read(activeNavTabProvider.notifier).state = 'saved',
+        isProfileSignedIn: authState.isAuthenticated,
+        profileInitials: authState.user?.initials,
+        profileTooltip: authState.isAuthenticated
+            ? '${authState.user!.displayName} (${authState.savedPlaces.length})'
+            : '${l10n.navProfile} — ${l10n.signIn}',
+        onRequestExit: () => unawaited(_handleExitRequest(isNavigating: isNavigating)),
+        mapLayer: KartaMapView(
+          controller: mapCtrl,
+          pmtilesUrl: pmtilesUrl,
+          initialCenter: liveLoc.coordinate ?? KartaRegionalAnchors.klcc.coordinate,
+          initialZoom: 14.8,
+          initialPitch: 48.0,
         ),
+        sidePanel: activeSidePanel,
+        topHudOverlay: topHudStack,
+        cornerHazardOverlay: const SpatialHazardCornerPill(),
+        topRightControls: _MapUtilityButtons(
+          axis: Axis.vertical,
+          mapCtrl: mapCtrl,
+          lighting: lighting,
+          liveLocation: liveLoc,
+          isNavigating: isNavigating,
+          onCycleLighting: () => ref.read(kartaLightingProvider.notifier).cyclePreference(),
+          onOpenLookAround: handleOpenLookAround,
+          onRecenter: handleRecenter,
+        ),
+        topRightControlsHorizontal: _MapUtilityButtons(
+          axis: Axis.horizontal,
+          mapCtrl: mapCtrl,
+          lighting: lighting,
+          liveLocation: liveLoc,
+          isNavigating: isNavigating,
+          onCycleLighting: () => ref.read(kartaLightingProvider.notifier).cyclePreference(),
+          onOpenLookAround: handleOpenLookAround,
+          onRecenter: handleRecenter,
+        ),
+        floatingRightOverlay: const FloatingCrowdsourcingTriggerCluster(),
+        bottomLeftOverlay: isNavigating ? SpeedTelemetryCluster(snapshot: navSnap) : null,
+        bottomCenterOverlay: bottomCenterWidget,
+        bottomVoiceWaveformOverlay: voiceState.isVisible ? const BottomVoiceWaveformPill() : null,
+        mobileActiveSheetOverlay: isNavigating ? MobileActiveNavigationSheet(snapshot: navSnap) : null,
+        bottomRightOverlay: null,
+        companionOverlay: IgnorePointer(
+          ignoring: !showCompanionMode,
+          child: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 360),
+            reverseDuration: const Duration(milliseconds: 300),
+            switchInCurve: Curves.easeOutCubic,
+            switchOutCurve: Curves.easeInCubic,
+            transitionBuilder: (child, animation) {
+              final slide = Tween<Offset>(
+                begin: const Offset(0, 0.05),
+                end: Offset.zero,
+              ).animate(animation);
+              return FadeTransition(
+                opacity: animation,
+                child: SlideTransition(position: slide, child: child),
+              );
+            },
+            child: showCompanionMode
+                ? KartaPointerShield(
+                    key: const ValueKey<String>('karta-companion-turn-list'),
+                    child: KartaCompanionTurnListOverlay(
+                      snapshot: navSnap,
+                      connection: autoConn,
+                      thermal: thermalProfile,
+                      lighting: lighting,
+                      onShowLiveMap: () =>
+                          ref.read(companionTurnListEnabledProvider.notifier).state = false,
+                    ),
+                  )
+                : const SizedBox.shrink(key: ValueKey<String>('karta-companion-empty')),
+          ),
+        ),
+        modalOverlay: activeModal,
       ),
-      modalOverlay: activeModal,
     );
   }
 }

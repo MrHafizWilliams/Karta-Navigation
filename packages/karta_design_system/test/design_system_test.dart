@@ -160,4 +160,54 @@ void main() {
     await tester.pumpAndSettle();
     expect(detents.last, equals(KartaSheetDetent.collapsed));
   });
+
+  testWidgets('KartaHighwaySignboard renders authentic shields for all 11 Southeast Asian nations',
+      (WidgetTester tester) async {
+    const cases = <({String cc, String ref, String cls})>[
+      (cc: 'MY', ref: 'E36', cls: 'motorway'),
+      (cc: 'SG', ref: 'PIE', cls: 'motorway'),
+      (cc: 'BN', ref: '1', cls: 'primary'),
+      (cc: 'ID', ref: '14', cls: 'primary'),
+      (cc: 'TH', ref: '4', cls: 'primary'),
+      (cc: 'TH', ref: 'M7', cls: 'motorway'),
+      (cc: 'PH', ref: 'N1', cls: 'primary'),
+      (cc: 'PH', ref: 'E1', cls: 'motorway'),
+      (cc: 'LA', ref: '13', cls: 'primary'),
+      (cc: 'KH', ref: 'NH6', cls: 'primary'),
+      (cc: 'KH', ref: 'E4', cls: 'motorway'),
+      (cc: 'VN', ref: 'CT.01', cls: 'motorway'),
+      (cc: 'VN', ref: 'QL.1A', cls: 'primary'),
+      (cc: 'TL', ref: 'A01', cls: 'primary'),
+      (cc: 'MM', ref: 'NH1', cls: 'primary'),
+      (cc: 'MY', ref: 'AH2', cls: 'motorway'),
+    ];
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: KartaTheme.dark(),
+        home: Scaffold(
+          body: SingleChildScrollView(
+            child: Column(
+              children: <Widget>[
+                for (final c in cases)
+                  KartaHighwaySignboard(
+                    valhallaManeuverType: 10,
+                    distanceText: '500 m',
+                    primaryInstruction: 'Continue on ${c.ref}',
+                    roadRef: c.ref,
+                    highwayClass: c.cls,
+                    countryCode: c.cc,
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
+    expect(tester.takeException(), isNull);
+    for (final c in cases) {
+      expect(find.text(c.ref), findsOneWidget);
+    }
+  });
 }
